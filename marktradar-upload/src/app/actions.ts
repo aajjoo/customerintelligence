@@ -1,13 +1,31 @@
 "use server";
 
+import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
+import { canSeeAllCustomers } from "@/lib/access";
+import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 // Server-Actions für die UI-Interaktionen der Etappe 2 (Review, Aufgaben, Freigaben).
-// Rechteprüfung pro Kundenteam folgt mit dem Google-Login (siehe Etappenplan).
+// Jede Mutation prüft die Team-Zugehörigkeit (Kernregel 3), Tests in tests/access.test.ts.
+
+/** Wirft, wenn der angemeldete Benutzer den Kunden nicht sehen darf. */
+async function requireCustomerAccess(customerId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Nicht angemeldet");
+  const { id, role } = session.user;
+  if (!canSeeAllCustomers(role)) {
+    const membership = await db.teamMembership.findFirst({
+      where: { userId: id, customerId },
+    });
+    if (!membership) throw new Error("Kein Zugriff auf diesen Kunden");
+  }
+}
 
 /** Signal-Review direkt auf der Karte: Relevant / Irrelevant. Neu-Markierung verschwindet nach Sichtung. */
 export async function reviewSignal(signalId: string, verdict: "relevant" | "irrelevant") {
+  const signal = await db.signal.findUniqueOrThrow({ where: { id: signalId } });
+  await requireCustomerAccess(signal.customerId);
   await db.signal.update({
     where: { id: signalId },
     data: { review: verdict, isNew: false },
@@ -21,6 +39,7 @@ export async function signalToOpportunity(signalId: string) {
     where: { id: signalId },
     include: { opportunity: true },
   });
+  await requireCustomerAccess(signal.customerId);
   if (!signal.opportunity) {
     await db.opportunity.create({
       data: {
@@ -42,6 +61,7 @@ export async function signalToOpportunity(signalId: string) {
 /** Signal → Aufgabe (z. B. KPI-Signal): behält den Quellenbezug über originLabel. */
 export async function signalToTask(signalId: string) {
   const signal = await db.signal.findUniqueOrThrow({ where: { id: signalId } });
+  await requireCustomerAccess(signal.customerId);
   await db.task.create({
     data: {
       customerId: signal.customerId,
@@ -59,6 +79,7 @@ export async function signalToTask(signalId: string) {
 /** Aufgabe abhaken / wieder öffnen. */
 export async function toggleTask(taskId: string) {
   const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+  await requireCustomerAccess(task.customerId);
   await db.task.update({
     where: { id: taskId },
     data: { status: task.status === "done" ? "open" : "done" },
@@ -68,6 +89,11 @@ export async function toggleTask(taskId: string) {
 
 /** Freigabe eines agentischen Workflows (Kernregel 2: nichts Externes ohne Freigabe). */
 export async function approveWorkflow(runId: string) {
+  const run = await db.workflowRun.findUniqueOrThrow({
+    where: { id: runId },
+    include: { task: true },
+  });
+  await requireCustomerAccess(run.task.customerId);
   await db.workflowRun.update({
     where: { id: runId },
     data: { status: "approved", approvalAt: new Date() },
@@ -77,6 +103,8 @@ export async function approveWorkflow(runId: string) {
 
 /** Monatsbericht freigeben (Account Lead). */
 export async function approveReport(reportId: string) {
+  const report = await db.report.findUniqueOrThrow({ where: { id: reportId } });
+  await requireCustomerAccess(report.customerId);
   await db.report.update({
     where: { id: reportId },
     data: { status: "approved", approvedAt: new Date() },

@@ -1,20 +1,27 @@
+import { getServerSession } from "next-auth";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import ChartCanvas from "@/components/ChartCanvas";
+import { customerWhereForUser } from "@/lib/access";
+import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ROLE_LABELS } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 // Screen 3 "Portfolio" (Management-Sicht): Balken-Chart je Kunde,
 // "Braucht Aufmerksamkeit"-Panel (regelbasiert) und Portfolio-Kennzahlen.
-// Rollenbasierte Sichtbarkeit (Kernregel 3) greift mit dem Google-Login.
+// Management/Admin sehen alle Kunden, alle anderen ihr eigenes Portfolio (Kernregel 3).
 
 export default async function PortfolioPage() {
   const now = new Date();
+  const session = await getServerSession(authOptions);
+  const user = session!.user;
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const customers = await db.customer.findMany({
+    where: customerWhereForUser(user.id, user.role),
     orderBy: { name: "asc" },
     include: {
       signals: true,
@@ -59,7 +66,12 @@ export default async function PortfolioPage() {
 
   return (
     <div className="grid min-h-screen md:grid-cols-[232px_1fr]">
-      <Sidebar active="/portfolio" newCount={totalNew} />
+      <Sidebar
+        active="/portfolio"
+        newCount={totalNew}
+        userName={user.name ?? undefined}
+        userRole={ROLE_LABELS[user.role] ?? user.role}
+      />
       <main className="w-full max-w-[1240px] px-5 pb-28 md:px-12 md:pb-20">
         <Topbar hasNew={totalNew > 0} />
 

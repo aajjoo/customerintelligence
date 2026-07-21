@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SignOutLink from "@/components/SignOutLink";
 
 // Feste Seitennavigation laut design-spec.md (mobil: Bottom-Navigation).
 // Aufgaben / Skills / Verwaltung folgen in späteren Etappen und führen wie im Prototyp auf Start.
@@ -66,6 +67,7 @@ export default function Sidebar({
             <div className="text-[0.72rem] text-gray-500">{userRole}</div>
           </div>
         </div>
+        <SignOutLink />
       </div>
     </aside>
   );

@@ -1,21 +1,31 @@
+import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import CustomerView from "@/components/customer/CustomerView";
 import type { CustomerDTO, WorkflowStepDTO } from "@/components/customer/types";
+import { customerWhereForUser } from "@/lib/access";
+import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { lastMonths } from "@/lib/format";
+import { ROLE_LABELS } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
 
 // Screen 2 "Kundenseite": lädt alle Daten des Kunden und übergibt sie als
 // serialisierbares DTO an die Client-Ansicht mit den 5 Tabs (siehe design-spec.md).
+// Zugriff nur für zugeordnete Teams bzw. Management/Admin (Kernregel 3).
 
 export default async function CustomerPage({ params }: { params: { slug: string } }) {
   const now = new Date();
-  const globalNew = await db.signal.count({ where: { isNew: true } });
-  const customer = await db.customer.findUnique({
-    where: { slug: params.slug },
+  const session = await getServerSession(authOptions);
+  const user = session!.user;
+  const accessWhere = customerWhereForUser(user.id, user.role);
+  const globalNew = await db.signal.count({
+    where: { isNew: true, customer: accessWhere },
+  });
+  const customer = await db.customer.findFirst({
+    where: { slug: params.slug, ...accessWhere },
     include: {
       signals: { orderBy: [{ occurredAt: "desc" }] },
       projects: {
@@ -136,7 +146,12 @@ export default async function CustomerPage({ params }: { params: { slug: string 
 
   return (
     <div className="grid min-h-screen md:grid-cols-[232px_1fr]">
-      <Sidebar active="/" newCount={globalNew} />
+      <Sidebar
+        active="/"
+        newCount={globalNew}
+        userName={user.name ?? undefined}
+        userRole={ROLE_LABELS[user.role] ?? user.role}
+      />
       <main className="w-full max-w-[1240px] px-5 pb-28 md:px-12 md:pb-20">
         <Topbar hasNew={globalNew > 0} />
         <CustomerView customer={dto} />

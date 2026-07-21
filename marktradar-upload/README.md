@@ -40,6 +40,12 @@ Etappe 2 (UI-Kern) abgeschlossen: alle Screens laut Prototyp mit Seed-Daten, noc
 - Server-Actions: Signal-Review (Relevant/Irrelevant), Signal → Opportunity/Aufgabe (mit Quellenbezug), Aufgabe abhaken, Workflow- und Berichts-Freigabe.
 - Tests: `npm test` (Formatierungs-/Delta-Logik, ohne DB).
 
-Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert. Google-Login mit Domain-Restriktion ist noch offen und wird vor Etappe 3 nachgezogen.
+Login & Rechte (nachgezogen aus Etappe 1):
+
+- **Google Sign-In** (NextAuth) mit Domain-Restriktion über `ALLOWED_EMAIL_DOMAIN`; ohne `GOOGLE_CLIENT_ID` läuft der **Demo-Modus** (Anmeldung als Seed-Lead, Hinweis auf der Login-Seite). `NEXTAUTH_SECRET` und `NEXTAUTH_URL` sind erforderlich.
+- **Rollenmodell**: Rolle aus der DB (member | lead | management | admin); neue Nutzer der erlaubten Domain werden als Teammitglied angelegt.
+- **Sichtbarkeit pro Kundenteam** (Kernregel 3): Management/Admin sehen alle Kunden, alle anderen nur zugeordnete – durchgesetzt in allen Seiten und Server-Actions; Rechte-Logik getestet in `tests/access.test.ts`.
+
+Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
 Nächster Schritt laut `CLAUDE.md`: Etappe 3, Pipeline v1 (News-Konnektor, Website-Crawler, Dedupe, Claude-Scoring, Review-Queue).
