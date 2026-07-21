@@ -74,10 +74,13 @@ export default function RadarTab({
     startPipeline(async () => {
       try {
         const result = await runPipelineForCustomer(customer.id);
+        const parts = [
+          `${result.fetched} Items geholt`,
+          `${result.created + result.kpiSignals} neue Signale`,
+        ];
+        if (result.discarded > 0) parts.push(`${result.discarded} als irrelevant aussortiert`);
         setPipelineMsg(
-          result.errors.length > 0
-            ? `Fehler: ${result.errors[0]}`
-            : `${result.fetched} Items geholt, ${result.created + result.kpiSignals} neue Signale`
+          result.errors.length > 0 ? `Fehler: ${result.errors[0]}` : parts.join(", ")
         );
       } catch (e) {
         setPipelineMsg(e instanceof Error ? e.message : "Pipeline-Lauf fehlgeschlagen");

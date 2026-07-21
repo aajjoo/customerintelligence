@@ -32,7 +32,8 @@ export type CustomerRunStats = {
   customer: string;
   fetched: number;
   fresh: number; // nach Dedupe
-  created: number; // als Signal angelegt
+  created: number; // als Signal in der Review-Queue
+  discarded: number; // bewertet, unter Relevanzschwelle aussortiert
   kpiSignals: number; // Kernregel 5
   errors: string[];
 };

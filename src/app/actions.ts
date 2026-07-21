@@ -110,6 +110,7 @@ export async function runPipelineForCustomer(customerId: string) {
   const stats = result.stats[0];
   return {
     created: stats?.created ?? 0,
+    discarded: stats?.discarded ?? 0,
     kpiSignals: stats?.kpiSignals ?? 0,
     fetched: stats?.fetched ?? 0,
     errors: stats?.errors ?? [],

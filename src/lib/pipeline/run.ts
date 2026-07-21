@@ -40,6 +40,7 @@ export async function runPipeline(options?: {
         fetched: 0,
         fresh: 0,
         created: 0,
+        discarded: 0,
         kpiSignals: 0,
         errors: [],
       };
@@ -121,10 +122,12 @@ export async function runPipeline(options?: {
             fresh.map((f) => f.item)
           );
           for (const s of scored) {
-            if (s.relevance < MIN_RELEVANCE) continue;
             // ScoredItem behält die Original-Referenzfelder (title/url) des RawItems
             const match = fresh.find((f) => f.item.title === s.title && f.item.url === s.url);
             if (!match) continue;
+            // Unter der Relevanzschwelle: als aussortiert speichern (UI blendet
+            // review=irrelevant aus) – verhindert erneutes Scoring im nächsten Lauf
+            const belowThreshold = s.relevance < MIN_RELEVANCE;
             await db.signal.create({
               data: {
                 customerId: customer.id,
@@ -137,9 +140,11 @@ export async function runPipeline(options?: {
                 relevance: s.relevance,
                 contentHash: match.hash,
                 occurredAt: s.publishedAt ?? new Date(),
+                ...(belowThreshold ? { review: "irrelevant", isNew: false } : {}),
               },
             });
-            stats.created++;
+            if (belowThreshold) stats.discarded++;
+            else stats.created++;
           }
         } catch (e) {
           stats.errors.push(`Scoring: ${e instanceof Error ? e.message : String(e)}`);
