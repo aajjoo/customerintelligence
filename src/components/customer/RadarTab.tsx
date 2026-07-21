@@ -3,12 +3,18 @@
 import { useMemo, useState, useTransition } from "react";
 import ChartCanvas from "@/components/ChartCanvas";
 import type { CustomerDTO, SignalDTO, TabKey } from "@/components/customer/types";
-import { reviewSignal, signalToOpportunity, signalToTask } from "@/app/actions";
+import {
+  reviewSignal,
+  runPipelineForCustomer,
+  signalToOpportunity,
+  signalToTask,
+} from "@/app/actions";
 import { fmtDay, fmtRelativeDay } from "@/lib/format";
 import { DIMENSIONS, dimensionLabel } from "@/lib/i18n";
 
-// Tab Radar: Dimension-Chips als Filter, Signalliste als Review-Inbox,
-// Seitenpanel mit Signalvolumen, Radar-Lage und Mitbewerbern.
+// Tab Radar: Dimension-Chips als Filter (inkl. Review-Queue "Zu prüfen"),
+// Signalliste als Review-Inbox, Seitenpanel mit Signalvolumen, Radar-Lage,
+// Mitbewerbern und manuellem Pipeline-Abruf (Etappe 3).
 
 export default function RadarTab({
   customer,
@@ -21,6 +27,8 @@ export default function RadarTab({
   // Optimistischer UI-Zustand: Bewertetes verliert die Neu-Markierung, Irrelevantes verschwindet.
   const [reviewed, setReviewed] = useState<Record<string, string>>({});
   const [, startTransition] = useTransition();
+  const [pipelineMsg, setPipelineMsg] = useState<string | null>(null);
+  const [pipelineRunning, startPipeline] = useTransition();
 
   const now = new Date(customer.now);
   const signals = useMemo(
@@ -30,7 +38,10 @@ export default function RadarTab({
       ),
     [customer.signals, reviewed]
   );
-  const visible = signals.filter((s) => dim === "all" || s.dimension === dim);
+  const visible = signals.filter((s) => {
+    if (dim === "queue") return s.review === "open" && !reviewed[s.id];
+    return dim === "all" || s.dimension === dim;
+  });
 
   const dims = DIMENSIONS.map((d) => ({
     ...d,
@@ -58,10 +69,32 @@ export default function RadarTab({
     startTransition(() => signalToTask(id));
   }
 
+  function triggerPipeline() {
+    setPipelineMsg(null);
+    startPipeline(async () => {
+      try {
+        const result = await runPipelineForCustomer(customer.id);
+        setPipelineMsg(
+          result.errors.length > 0
+            ? `Fehler: ${result.errors[0]}`
+            : `${result.fetched} Items geholt, ${result.created + result.kpiSignals} neue Signale`
+        );
+      } catch (e) {
+        setPipelineMsg(e instanceof Error ? e.message : "Pipeline-Lauf fehlgeschlagen");
+      }
+    });
+  }
+
   return (
     <div>
-      <div className="mb-7 flex flex-wrap gap-2">
+      <div className="mb-7 flex flex-wrap items-center gap-2">
         <Chip active={dim === "all"} onClick={() => setDim("all")} label="Alle" count={signals.length} />
+        <Chip
+          active={dim === "queue"}
+          onClick={() => setDim("queue")}
+          label="Zu prüfen"
+          count={reviewQueue}
+        />
         {dims.map((d) => (
           <Chip
             key={d.key}
@@ -71,7 +104,18 @@ export default function RadarTab({
             count={d.count}
           />
         ))}
+        <button
+          className="ml-auto rounded-el border border-gray-300 px-3.5 py-1.5 text-[0.82rem] font-medium text-gray-700 hover:border-ink hover:text-ink disabled:opacity-50"
+          onClick={triggerPipeline}
+          disabled={pipelineRunning}
+          title="Aktive Quellen abrufen, deduplizieren und mit Claude bewerten"
+        >
+          {pipelineRunning ? "Quellen werden abgerufen …" : "↻ Quellen abrufen"}
+        </button>
       </div>
+      {pipelineMsg && (
+        <p className="-mt-4 mb-5 text-[0.82rem] text-gray-500">{pipelineMsg}</p>
+      )}
 
       <div className="grid items-start gap-9 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-3.5">

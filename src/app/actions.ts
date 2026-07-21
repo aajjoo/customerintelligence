@@ -101,6 +101,21 @@ export async function approveWorkflow(runId: string) {
   revalidatePath("/", "layout");
 }
 
+/** Pipeline manuell für einen Kunden anstoßen (Quellen abrufen, bewerten, Review-Queue). */
+export async function runPipelineForCustomer(customerId: string) {
+  await requireCustomerAccess(customerId);
+  const { runPipeline } = await import("@/lib/pipeline/run");
+  const result = await runPipeline({ customerId, trigger: "manual" });
+  revalidatePath("/", "layout");
+  const stats = result.stats[0];
+  return {
+    created: stats?.created ?? 0,
+    kpiSignals: stats?.kpiSignals ?? 0,
+    fetched: stats?.fetched ?? 0,
+    errors: stats?.errors ?? [],
+  };
+}
+
 /** Monatsbericht freigeben (Account Lead). */
 export async function approveReport(reportId: string) {
   const report = await db.report.findUniqueOrThrow({ where: { id: reportId } });

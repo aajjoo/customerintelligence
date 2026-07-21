@@ -63,7 +63,6 @@ async function main() {
   });
   await db.signal.createMany({
     data: [
-      { customerId: alp.id, dimension: "intern", title: "KPI-Abweichung: Portal-Adoption unter Schwellenwert", summary: "Die Aktivierungsrate im Kundenportal liegt mit 46 % erstmals unter dem Schwellenwert von 50 % (Ziel: 65 %). Hauptursache laut Analytics: Abbrüche bei der Erstregistrierung von Händlern.", sourceLabel: "Projekt Kundenportal · KPI Adoption", relevance: 88, isNew: true, isKpiSignal: true, occurredAt: new Date("2026-07-20") },
       { customerId: alp.id, dimension: "kunde", title: "AlpenStahl sucht „Digital Process Manager Logistik“", summary: "Neue Stellenausschreibung deutet auf geplante Digitalisierung der Werkslogistik hin. Bisher kein Netural-Projekt in diesem Bereich – möglicher Anknüpfungspunkt für Analyse & Strategie.", sourceLabel: "karriere.alpenstahl.example", relevance: 74, isNew: true, occurredAt: new Date("2026-07-20") },
       { customerId: alp.id, dimension: "politik", title: "CBAM-Berichtspflichten werden ab 2027 erweitert", summary: "Die EU konkretisiert die CO2-Grenzausgleichs-Berichterstattung. Für AlpenStahl steigen Datenanforderungen entlang der Lieferkette – relevant für die Datenplattform (Phase 2).", sourceLabel: "EU-Kommission", relevance: 66, isNew: false, occurredAt: new Date("2026-07-18") },
       { customerId: alp.id, dimension: "geschaeft", title: "Halbjahreszahlen: Servicegeschäft wächst um 12 %", summary: "Der Vorstand betont im Earnings Call den Ausbau digitaler Services als strategische Priorität für 2027. Investitionsbudget für Digitalisierung wurde um 20 % erhöht.", sourceLabel: "Geschäftsbericht H1", relevance: 81, isNew: false, occurredAt: new Date("2026-07-15") },
@@ -95,6 +94,16 @@ async function main() {
   for (const [m, v] of adoptionVals) {
     await db.kpiValue.create({ data: { kpiId: adoption.id, period: month(m), value: v } });
   }
+  // KPI-Signal (Kernregel 5) mit Dedupe-Hash, damit die Pipeline es nicht dupliziert
+  await db.signal.create({
+    data: {
+      customerId: alp.id, dimension: "intern", isKpiSignal: true, isNew: true,
+      title: "KPI-Abweichung: Portal-Adoption unter Schwellenwert",
+      summary: "Die Aktivierungsrate im Kundenportal liegt mit 46 % erstmals unter dem Schwellenwert von 50 % (Ziel: 65 %). Hauptursache laut Analytics: Abbrüche bei der Erstregistrierung von Händlern.",
+      sourceLabel: "Projekt Kundenportal · KPI Adoption", relevance: 88,
+      contentHash: `kpi:${adoption.id}:2026-07`, occurredAt: new Date("2026-07-20"),
+    },
+  });
   const deflection = await db.kpi.create({
     data: { projectId: portal.id, label: "Ticket-Deflection", unit: "%", target: 40, direction: "up" },
   });
