@@ -101,6 +101,54 @@ export async function approveWorkflow(runId: string) {
   revalidatePath("/", "layout");
 }
 
+/** Onboarding Schritt 3: bestätigten Profilvorschlag als Kunden anlegen (Etappe 4). */
+export async function createCustomerFromProposal(proposal: {
+  websiteUrl: string;
+  name: string;
+  industry: string;
+  markets: string | null;
+  competitors: string[];
+  themes: string[];
+  sources: { kind: "news" | "website"; label: string; url: string }[];
+}): Promise<{ slug: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Nicht angemeldet");
+  if (!["lead", "management", "admin"].includes(session.user.role)) {
+    throw new Error("Kunden anlegen dürfen Account Leads, Management und Admin");
+  }
+  if (!proposal.name.trim() || !proposal.industry.trim()) {
+    throw new Error("Name und Branche dürfen nicht leer sein");
+  }
+
+  const { slugify } = await import("@/lib/onboarding/slug");
+  let slug = slugify(proposal.name) || "kunde";
+  for (let i = 2; await db.customer.findUnique({ where: { slug } }); i++) {
+    slug = `${slugify(proposal.name)}-${i}`;
+  }
+
+  const customer = await db.customer.create({
+    data: {
+      name: proposal.name.trim(),
+      slug,
+      industry: proposal.industry.trim(),
+      markets: proposal.markets?.trim() || null,
+      websiteUrl: proposal.websiteUrl,
+      profileJson: JSON.stringify({
+        competitors: proposal.competitors.filter((c) => c.trim()),
+        themes: proposal.themes.filter((t) => t.trim()),
+      }),
+      sources: {
+        create: proposal.sources.map((s) => ({ kind: s.kind, label: s.label, url: s.url })),
+      },
+      // Wer den Kunden anlegt, wird Account Lead des Kundenteams
+      memberships: { create: { userId: session.user.id, isLead: true } },
+    },
+  });
+
+  revalidatePath("/", "layout");
+  return { slug: customer.slug };
+}
+
 /** Pipeline manuell für einen Kunden anstoßen (Quellen abrufen, bewerten, Review-Queue). */
 export async function runPipelineForCustomer(customerId: string) {
   await requireCustomerAccess(customerId);

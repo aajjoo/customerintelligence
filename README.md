@@ -31,14 +31,19 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappe 2 (UI-Kern) abgeschlossen: alle Screens laut Prototyp mit Seed-Daten, noch ohne Pipeline.
+Etappen 1-4 abgeschlossen: UI-Kern, Login/Rechte, Pipeline v1 und Kunden-Onboarding.
+
+**Pipeline v1 (Etappe 3):** Quellen-Konnektoren (RSS 2.0 / RSS 1.0-RDF / Atom, Website-Crawler mit Änderungserkennung), Dedupe über Titel-Hash, Claude-Scoring gegen Kundenprofil + Netural-Leistungsportfolio mit deutscher Zusammenfassung (strukturierte Outputs, gebatcht), Review-Queue im Radar-Tab ("Zu prüfen"-Filter, "Quellen abrufen"-Button). Aussortierte Items werden als review=irrelevant gespeichert (kein Re-Scoring). Kernregel 5: KPI unter Schwelle erzeugt automatisch ein "Internes Lagebild"-Signal (dedupliziert je KPI+Monat). Jeder Lauf protokolliert als PipelineRun. Täglicher Cron 6:00 über vercel.json → /api/pipeline/run (CRON_SECRET). Benötigt ANTHROPIC_API_KEY; optional CLAUDE_MODEL.
+
+**Kunden-Onboarding (Etappe 4):** Modal "Kunde hinzufügen" mit echtem Flow: URL → Crawl (Startseite + Presse/Karriere, RSS-Discovery) → Claude-Profilvorschlag (Name, Branche, Märkte, Mitbewerber-Kandidaten, strategische Themen) → editierbarer Bestätigen-Screen → Kunde mit Quellen und Team-Zuordnung (Ersteller wird Account Lead). Kunden anlegen dürfen lead/management/admin. Extraktion über /api/onboarding/extract (maxDuration 60s).
+
+Etappe 2 (UI-Kern): alle Screens laut Prototyp.
 
 - **Meine Kunden**: Begrüßung + Tageszusammenfassung, Kundenkarten mit Neu-Badge, Top-Signal, Sparkline und Metazeile.
 - **Kundenseite** mit 5 Tabs: Radar (Dimension-Chips, Signal-Review direkt auf der Karte, Signalvolumen-Chart, Radar-Lage, Mitbewerber), Projekte & KPIs (Status-LED mit Textlabel, KPI-Kacheln, Verlaufscharts mit Ziel-/Schwellenlinie), Chat (deterministische Antworten aus Seed-Daten mit Quellen-Chips, Fragevorschläge mit Rollen-Umschalter; RAG folgt in Etappe 6), Aufgaben (Opportunity-Pipeline, Aufgabenliste, Workflow-Karte mit Freigabe-Block), Bericht (Executive Summary aus DB, berechnete Abschnitte, Freigabe).
 - **Portfolio** (Management-Sicht): Chart je Kunde, regelbasiertes "Braucht Aufmerksamkeit", Kennzahlen.
-- **Modal "Kunde hinzufügen"**: Demo-Ablauf wie im Prototyp; echte Extraktion folgt in Etappe 4.
 - Server-Actions: Signal-Review (Relevant/Irrelevant), Signal → Opportunity/Aufgabe (mit Quellenbezug), Aufgabe abhaken, Workflow- und Berichts-Freigabe.
-- Tests: `npm test` (Formatierungs-/Delta-Logik, ohne DB).
+- Tests: `npm test` (Formatierung, Rechteprüfung, Pipeline-Logik, Onboarding – ohne DB/Netz).
 
 Login & Rechte (nachgezogen aus Etappe 1):
 
@@ -48,4 +53,4 @@ Login & Rechte (nachgezogen aus Etappe 1):
 
 Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
-Nächster Schritt laut `CLAUDE.md`: Etappe 3, Pipeline v1 (News-Konnektor, Website-Crawler, Dedupe, Claude-Scoring, Review-Queue).
+Nächster Schritt laut `CLAUDE.md`: Etappe 5, Monatsbericht + Aufgaben (Berichtgenerierung, Freigabe, PDF-Export, Erinnerung, Eskalation).
