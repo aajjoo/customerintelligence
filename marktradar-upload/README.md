@@ -31,4 +31,15 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappe 1 (Gerüst) abgeschlossen: App-Shell, Design-Tokens, Datenmodell (PostgreSQL), Seed, Startseite und Kunden-Rohansicht. Nächster Schritt laut `CLAUDE.md`: Etappe 2, vollständige Kundenseite mit Tabs.
+Etappe 2 (UI-Kern) abgeschlossen: alle Screens laut Prototyp mit Seed-Daten, noch ohne Pipeline.
+
+- **Meine Kunden**: Begrüßung + Tageszusammenfassung, Kundenkarten mit Neu-Badge, Top-Signal, Sparkline und Metazeile.
+- **Kundenseite** mit 5 Tabs: Radar (Dimension-Chips, Signal-Review direkt auf der Karte, Signalvolumen-Chart, Radar-Lage, Mitbewerber), Projekte & KPIs (Status-LED mit Textlabel, KPI-Kacheln, Verlaufscharts mit Ziel-/Schwellenlinie), Chat (deterministische Antworten aus Seed-Daten mit Quellen-Chips, Fragevorschläge mit Rollen-Umschalter; RAG folgt in Etappe 6), Aufgaben (Opportunity-Pipeline, Aufgabenliste, Workflow-Karte mit Freigabe-Block), Bericht (Executive Summary aus DB, berechnete Abschnitte, Freigabe).
+- **Portfolio** (Management-Sicht): Chart je Kunde, regelbasiertes "Braucht Aufmerksamkeit", Kennzahlen.
+- **Modal "Kunde hinzufügen"**: Demo-Ablauf wie im Prototyp; echte Extraktion folgt in Etappe 4.
+- Server-Actions: Signal-Review (Relevant/Irrelevant), Signal → Opportunity/Aufgabe (mit Quellenbezug), Aufgabe abhaken, Workflow- und Berichts-Freigabe.
+- Tests: `npm test` (Formatierungs-/Delta-Logik, ohne DB).
+
+Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert. Google-Login mit Domain-Restriktion ist noch offen und wird vor Etappe 3 nachgezogen.
+
+Nächster Schritt laut `CLAUDE.md`: Etappe 3, Pipeline v1 (News-Konnektor, Website-Crawler, Dedupe, Claude-Scoring, Review-Queue).

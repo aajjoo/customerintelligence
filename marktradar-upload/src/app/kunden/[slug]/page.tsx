@@ -1,104 +1,145 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
+import CustomerView from "@/components/customer/CustomerView";
+import type { CustomerDTO, WorkflowStepDTO } from "@/components/customer/types";
 import { db } from "@/lib/db";
+import { lastMonths } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-type SignalRow = {
-  id: string;
-  isNew: boolean;
-  relevance: number;
-  isKpiSignal: boolean;
-  dimension: string;
-  occurredAt: Date;
-  title: string;
-  summary: string;
-  sourceLabel: string | null;
-};
-
-const DIM_LABELS: Record<string, string> = {
-  markt: "Markt & Branche",
-  kunde: "Kunde direkt",
-  mitbewerb: "Mitbewerb",
-  innovation: "Innovation",
-  geschaeft: "Geschäftsebene",
-  politik: "Politik & Regulatorik",
-  intern: "Internes Lagebild",
-};
+// Screen 2 "Kundenseite": lädt alle Daten des Kunden und übergibt sie als
+// serialisierbares DTO an die Client-Ansicht mit den 5 Tabs (siehe design-spec.md).
 
 export default async function CustomerPage({ params }: { params: { slug: string } }) {
+  const now = new Date();
+  const globalNew = await db.signal.count({ where: { isNew: true } });
   const customer = await db.customer.findUnique({
     where: { slug: params.slug },
     include: {
       signals: { orderBy: [{ occurredAt: "desc" }] },
-      projects: { include: { kpis: { include: { values: { orderBy: { period: "asc" } } } } } },
-      opportunities: true,
-      tasks: { where: { status: "open" } },
+      projects: {
+        orderBy: { createdAt: "asc" },
+        include: { kpis: { include: { values: { orderBy: { period: "asc" } } } } },
+      },
+      opportunities: { orderBy: { updatedAt: "desc" } },
+      tasks: {
+        orderBy: [{ status: "desc" }, { dueAt: "asc" }], // offene zuerst, erledigte unten
+        include: { assignee: true, workflowRun: true },
+      },
+      reports: { orderBy: { month: "desc" }, take: 1 },
+      memberships: { where: { isLead: true }, include: { user: true } },
     },
   });
   if (!customer) notFound();
 
+  const monthFmt = new Intl.DateTimeFormat("de-AT", { month: "short" });
+  const monthly = lastMonths(6, now).map((m) => {
+    const end = new Date(m.start.getFullYear(), m.start.getMonth() + 1, 1);
+    const inMonth = customer.signals.filter((s) => s.occurredAt >= m.start && s.occurredAt < end);
+    return { label: m.label, total: inMonth.length, hot: inMonth.filter((s) => s.relevance >= 80).length };
+  });
+
+  let competitors: string[] = [];
+  try {
+    competitors = JSON.parse(customer.profileJson ?? "{}").competitors ?? [];
+  } catch {
+    // profileJson ist optional; ohne Profil kein Mitbewerber-Panel
+  }
+
+  const dto: CustomerDTO = {
+    id: customer.id,
+    name: customer.name,
+    slug: customer.slug,
+    industry: customer.industry,
+    markets: customer.markets,
+    teamLabel: customer.teamLabel,
+    radarSince: customer.radarSince.toISOString(),
+    leadName: customer.memberships[0]?.user.name ?? null,
+    competitors,
+    signals: customer.signals.map((s) => ({
+      id: s.id,
+      dimension: s.dimension,
+      title: s.title,
+      summary: s.summary,
+      sourceLabel: s.sourceLabel,
+      sourceUrl: s.sourceUrl,
+      relevance: s.relevance,
+      isNew: s.isNew,
+      isKpiSignal: s.isKpiSignal,
+      review: s.review,
+      occurredAt: s.occurredAt.toISOString(),
+    })),
+    projects: customer.projects.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      phase: p.phase,
+      status: p.status,
+      externalRef: p.externalRef,
+      kpis: p.kpis.map((k) => ({
+        id: k.id,
+        label: k.label,
+        unit: k.unit,
+        target: k.target,
+        threshold: k.threshold,
+        direction: k.direction,
+        values: k.values.map((v) => ({ label: monthFmt.format(v.period), value: v.value })),
+      })),
+    })),
+    opportunities: customer.opportunities.map((o) => ({
+      id: o.id,
+      title: o.title,
+      stage: o.stage,
+      ownerLabel: o.ownerLabel,
+      rationale: o.rationale,
+      updatedAt: o.updatedAt.toISOString(),
+    })),
+    tasks: customer.tasks.map((t) => {
+      let steps: WorkflowStepDTO[] = [];
+      if (t.workflowRun) {
+        try {
+          steps = JSON.parse(t.workflowRun.stepsJson);
+        } catch {
+          steps = [];
+        }
+      }
+      return {
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        originLabel: t.originLabel,
+        dueAt: t.dueAt?.toISOString() ?? null,
+        assigneeName: t.assignee?.name ?? null,
+        workflow: t.workflowRun
+          ? {
+              id: t.workflowRun.id,
+              skillName: t.workflowRun.skillName,
+              status: t.workflowRun.status,
+              steps,
+              taskTitle: t.title,
+            }
+          : null,
+      };
+    }),
+    report: customer.reports[0]
+      ? {
+          id: customer.reports[0].id,
+          month: customer.reports[0].month,
+          execSummary: customer.reports[0].execSummary,
+          status: customer.reports[0].status,
+        }
+      : null,
+    monthly,
+    now: now.toISOString(),
+  };
+
   return (
     <div className="grid min-h-screen md:grid-cols-[232px_1fr]">
-      <Sidebar active="/" />
-      <main className="w-full max-w-[1240px] px-6 pb-20 md:px-12">
-        <Topbar />
-        <div className="mb-4 text-sm text-gray-500">
-          <Link href="/" className="hover:text-ink">
-            Meine Kunden
-          </Link>{" "}
-          / {customer.name}
-        </div>
-        <h1 className="text-[2.1rem] leading-tight">{customer.name}</h1>
-        <p className="text-gray-500">
-          {customer.industry} · {customer.markets} ·{" "}
-          {customer.projects.length} Projekte · {customer.opportunities.length} Opportunities ·{" "}
-          {customer.tasks.length} offene Aufgaben
-        </p>
-
-        {/* Etappe 2 baut hier die Tabs Radar / Projekte & KPIs / Chat / Aufgaben / Bericht */}
-        <h2 className="mb-4 mt-10 text-lg">Radar</h2>
-        <div className="flex max-w-3xl flex-col gap-3.5">
-          {customer.signals.map((s: SignalRow) => (
-            <div
-              key={s.id}
-              className="rounded-card border border-gray-150 p-5 transition-colors hover:border-ink"
-            >
-              <div className="mb-2 flex flex-wrap items-center gap-2.5">
-                {s.isNew && (
-                  <span className="rounded bg-accent px-2 py-0.5 text-[0.72rem] font-medium uppercase tracking-wide text-ink">
-                    Neu
-                  </span>
-                )}
-                {s.relevance >= 80 && (
-                  <span className="rounded bg-ink px-2 py-0.5 text-[0.72rem] font-medium uppercase tracking-wide text-paper">
-                    Hohe Relevanz
-                  </span>
-                )}
-                {s.isKpiSignal && (
-                  <span className="rounded bg-accent-soft px-2 py-0.5 text-[0.72rem] font-medium uppercase tracking-wide text-gray-900">
-                    KPI-Signal
-                  </span>
-                )}
-                <span className="rounded bg-gray-75 px-2 py-0.5 text-[0.72rem] font-medium uppercase tracking-wide text-gray-700">
-                  {DIM_LABELS[s.dimension] ?? s.dimension}
-                </span>
-                <span className="ml-auto text-xs text-gray-500">
-                  {new Intl.DateTimeFormat("de-AT", { day: "numeric", month: "long" }).format(
-                    s.occurredAt
-                  )}
-                </span>
-              </div>
-              <h4 className="mb-1.5 font-medium">{s.title}</h4>
-              <p className="text-sm leading-relaxed text-gray-700">{s.summary}</p>
-              {s.sourceLabel && (
-                <div className="mt-2.5 text-xs text-gray-500">Quelle: {s.sourceLabel}</div>
-              )}
-            </div>
-          ))}
-        </div>
+      <Sidebar active="/" newCount={globalNew} />
+      <main className="w-full max-w-[1240px] px-5 pb-28 md:px-12 md:pb-20">
+        <Topbar hasNew={globalNew > 0} />
+        <CustomerView customer={dto} />
       </main>
     </div>
   );

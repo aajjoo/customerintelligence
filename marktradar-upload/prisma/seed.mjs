@@ -28,7 +28,7 @@ async function main() {
   });
 
   const customers = [
-    { name: "AlpenStahl AG", slug: "alpenstahl", industry: "Stahl & Industrie", markets: "DACH + Norditalien", teamLabel: "Kundenteam A", websiteUrl: "https://www.alpenstahl.example" },
+    { name: "AlpenStahl AG", slug: "alpenstahl", industry: "Stahl & Industrie", markets: "DACH + Norditalien", teamLabel: "Kundenteam A", websiteUrl: "https://www.alpenstahl.example", radarSince: new Date("2026-03-01"), profileJson: JSON.stringify({ competitors: ["Ferrotec", "SteelWorks Int.", "Donau Metall"], themes: ["Digitale Services", "Werkslogistik", "CBAM / Lieferkette"] }) },
     { name: "GreenCharge Energy", slug: "greencharge", industry: "E-Mobility", markets: "Österreich, Deutschland", teamLabel: "Kundenteam B", websiteUrl: "https://www.greencharge.example" },
     { name: "MediCare Group", slug: "medicare", industry: "Gesundheit", markets: "Österreich", teamLabel: "Kundenteam A", websiteUrl: "https://www.medicare.example" },
     { name: "Alpina Retail", slug: "alpina-retail", industry: "Handel", markets: "DACH", teamLabel: "Kundenteam C", websiteUrl: "https://www.alpina-retail.example" },
@@ -134,7 +134,9 @@ async function main() {
     data: [
       { customerId: alp.id, stage: "new", title: "Logistik-Digitalisierung als Beratungsthema platzieren", rationale: "Signal Stellenausschreibung; Bezug: Analyse & Strategie." },
       { customerId: alp.id, stage: "new", title: "CBAM-Datenanforderungen in Datenplattform Phase 2", rationale: "Signal EU-Regulatorik; Bezug: Daten & KI." },
+      { customerId: alp.id, stage: "drafting", title: "Maßnahmenpaket Händler-Registrierung", ownerLabel: "L. Huber" },
       { customerId: alp.id, stage: "placed", title: "Ausbau Service-App auf Werk Donawitz", ownerLabel: "A. Ortig" },
+      { customerId: alp.id, stage: "won", title: "Datenplattform Phase 2", ownerLabel: "A. Ortig" },
     ],
   });
   const t1 = await db.task.create({

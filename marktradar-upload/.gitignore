@@ -1,0 +1,18 @@
+# Abhängigkeiten
+node_modules/
+
+# Next.js Build
+.next/
+out/
+
+# Umgebungsvariablen (Secrets nie committen, siehe CLAUDE.md)
+.env
+.env*.local
+
+# Diverses
+.DS_Store
+*.tsbuildinfo
+next-env.d.ts
+
+# Lokale Claude-Code-Konfiguration
+.claude/
