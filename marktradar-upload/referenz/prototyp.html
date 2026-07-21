@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Netural Marktradar – UX/UI Prototyp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Hind:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --black:#0A0A0A; --white:#FFFFFF;
+  --gray-900:#1A1A1A; --gray-700:#444444; --gray-500:#6E6E6E; --gray-300:#B8B8B4; --gray-150:#E7E7E3; --gray-075:#F4F4F1;
+  --accent:#F1BB1E; --accent-soft:#FBEFC9;
+  --pos:#0E957D; --neg:#C9432F;
+  --radius:12px; --radius-s:8px;
+  --font:'Hind',-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:16px}
+body{font-family:var(--font);font-weight:300;color:var(--black);background:var(--white);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-weight:500;letter-spacing:-.01em}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+::selection{background:var(--accent-soft)}
+
+/* ---------- Layout ---------- */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.sidebar{border-right:1px solid var(--gray-150);padding:28px 20px;display:flex;flex-direction:column;gap:32px;position:sticky;top:0;height:100vh}
+.logo{font-weight:600;font-size:1.15rem;letter-spacing:-.02em}
+.logo span{font-weight:300;color:var(--gray-500)}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius-s);font-size:.95rem;font-weight:400;color:var(--gray-700);text-align:left;width:100%}
+.nav button:hover{background:var(--gray-075)}
+.nav button.active{background:var(--black);color:var(--white);font-weight:500}
+.nav .count{margin-left:auto;font-size:.75rem;background:var(--accent);color:var(--black);border-radius:20px;padding:1px 8px;font-weight:500}
+.nav button.active .count{background:var(--accent)}
+.sidebar .foot{margin-top:auto;font-size:.8rem;color:var(--gray-500);line-height:1.5}
+.user{display:flex;align-items:center;gap:10px;margin-top:12px}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--black);color:var(--white);display:flex;align-items:center;justify-content:center;font-weight:500;font-size:.85rem}
+.user .name{font-size:.85rem;font-weight:400;color:var(--gray-900)}
+.user .role{font-size:.72rem;color:var(--gray-500)}
+
+.main{padding:0 48px 80px;max-width:1240px;width:100%}
+.topbar{display:flex;align-items:center;gap:16px;padding:24px 0;border-bottom:1px solid var(--gray-150);margin-bottom:36px}
+.search{flex:1;max-width:420px;display:flex;align-items:center;gap:8px;background:var(--gray-075);border-radius:var(--radius-s);padding:9px 14px;color:var(--gray-500);font-size:.9rem}
+.iconbtn{position:relative;width:38px;height:38px;border-radius:var(--radius-s);display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+.iconbtn:hover{background:var(--gray-075)}
+.iconbtn .dot{position:absolute;top:7px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.btn{background:var(--black);color:var(--white);padding:10px 20px;border-radius:var(--radius-s);font-size:.9rem;font-weight:500}
+.btn:hover{background:var(--gray-900)}
+.btn.ghost{background:transparent;color:var(--black);border:1px solid var(--gray-300)}
+.btn.ghost:hover{background:var(--gray-075)}
+
+.screen{display:none}
+.screen.active{display:block}
+.eyebrow{font-size:.78rem;text-transform:uppercase;letter-spacing:.09em;color:var(--gray-500);font-weight:500;margin-bottom:8px}
+.h-page{font-size:2.1rem;line-height:1.15;margin-bottom:6px}
+.sub{color:var(--gray-500);font-size:1rem;max-width:640px}
+
+/* ---------- Kundenkarten ---------- */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:32px}
+.card{border:1px solid var(--gray-150);border-radius:var(--radius);padding:22px;transition:border-color .15s;cursor:pointer;background:var(--white)}
+.card:hover{border-color:var(--black)}
+.card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.card h3{font-size:1.15rem}
+.card .branch{font-size:.8rem;color:var(--gray-500)}
+.newpill{background:var(--accent);color:var(--black);font-size:.72rem;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.card .signal{font-size:.9rem;line-height:1.45;color:var(--gray-700);border-left:2px solid var(--accent);padding-left:12px;margin:14px 0}
+.card .meta{display:flex;gap:18px;font-size:.78rem;color:var(--gray-500);margin-top:12px}
+.card .meta b{display:block;font-size:1.05rem;font-weight:500;color:var(--black)}
+.spark{margin-top:6px}
+
+/* ---------- Kundenseite ---------- */
+.crumb{font-size:.85rem;color:var(--gray-500);margin-bottom:16px}
+.crumb a{color:var(--gray-500);text-decoration:none;cursor:pointer}
+.crumb a:hover{color:var(--black)}
+.custhead{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--gray-150);margin:28px 0 32px}
+.tabs button{padding:12px 18px;font-size:.95rem;font-weight:400;color:var(--gray-500);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button.active{color:var(--black);font-weight:500;border-color:var(--black)}
+.tabs button .n{font-size:.72rem;background:var(--gray-075);border-radius:12px;padding:1px 7px;margin-left:6px;color:var(--gray-700)}
+.tabs button.active .n{background:var(--accent);color:var(--black)}
+.tabpane{display:none}
+.tabpane.active{display:block}
+
+/* Radar */
+.dims{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:28px}
+.chip{border:1px solid var(--gray-300);border-radius:20px;padding:6px 15px;font-size:.85rem;color:var(--gray-700);background:var(--white)}
+.chip:hover{border-color:var(--black);color:var(--black)}
+.chip.active{background:var(--black);color:var(--white);border-color:var(--black);font-weight:500}
+.chip .c{font-size:.75rem;opacity:.6;margin-left:4px}
+.radarwrap{display:grid;grid-template-columns:1fr 320px;gap:36px;align-items:start}
+.siglist{display:flex;flex-direction:column;gap:14px}
+.sig{border:1px solid var(--gray-150);border-radius:var(--radius);padding:18px 20px;cursor:pointer;transition:border-color .15s}
+.sig:hover{border-color:var(--black)}
+.sig .head{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.tag{font-size:.72rem;font-weight:500;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px;border-radius:4px;background:var(--gray-075);color:var(--gray-700)}
+.tag.hot{background:var(--black);color:var(--white)}
+.tag.new{background:var(--accent);color:var(--black)}
+.tag.kpi{background:var(--accent-soft);color:var(--gray-900)}
+.sig .date{font-size:.78rem;color:var(--gray-500);margin-left:auto}
+.sig h4{font-size:1.02rem;margin-bottom:6px;font-weight:500}
+.sig p{font-size:.9rem;color:var(--gray-700);line-height:1.5}
+.sig .src{font-size:.78rem;color:var(--gray-500);margin-top:10px;display:flex;gap:14px;align-items:center}
+.sig .src a{color:var(--gray-500)}
+.sig .acts{display:flex;gap:6px;margin-left:auto}
+.sig .acts button{font-size:.78rem;padding:4px 10px;border:1px solid var(--gray-150);border-radius:6px;color:var(--gray-700)}
+.sig .acts button:hover{border-color:var(--black);color:var(--black)}
+.aside{display:flex;flex-direction:column;gap:24px}
+.panel{border:1px solid var(--gray-150);border-radius:var(--radius);padding:20px}
+.panel h4{font-size:.95rem;margin-bottom:14px}
+.panel .row{display:flex;justify-content:space-between;font-size:.88rem;padding:7px 0;border-bottom:1px solid var(--gray-075);color:var(--gray-700)}
+.panel .row:last-child{border:none}
+.panel .row b{font-weight:500;color:var(--black)}
+.chartbox{height:150px}
+
+/* Projekte */
+.projgrid{display:flex;flex-direction:column;gap:22px}
+.proj{border:1px solid var(--gray-150);border-radius:var(--radius);padding:24px}
+.proj .head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.proj h3{font-size:1.2rem}
+.status{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:400;color:var(--gray-700)}
+.status .led{width:9px;height:9px;border-radius:50%}
+.led.ok{background:var(--pos)} .led.warn{background:var(--accent)} .led.crit{background:var(--neg)}
+.proj .phase{font-size:.82rem;color:var(--gray-500);margin-left:auto}
+.proj .desc{font-size:.9rem;color:var(--gray-700);margin:8px 0 20px;max-width:720px;line-height:1.5}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.kpi{background:var(--gray-075);border-radius:var(--radius-s);padding:16px 18px}
+.kpi .label{font-size:.78rem;color:var(--gray-500);margin-bottom:6px}
+.kpi .val{font-size:1.65rem;font-weight:500;letter-spacing:-.02em;line-height:1}
+.kpi .delta{font-size:.8rem;margin-top:6px;font-weight:400}
+.delta.up{color:var(--pos)} .delta.down{color:var(--neg)} .delta.flat{color:var(--gray-500)}
+.kpi .target{font-size:.72rem;color:var(--gray-500);margin-top:3px}
+.projcharts{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:22px}
+.projcharts .cbox{border:1px solid var(--gray-150);border-radius:var(--radius-s);padding:16px}
+.cbox .t{font-size:.82rem;color:var(--gray-500);margin-bottom:10px}
+.cbox .ch{height:160px}
+.milelist{margin-top:20px;display:flex;gap:26px;flex-wrap:wrap;font-size:.85rem;color:var(--gray-700)}
+.milelist span b{font-weight:500;color:var(--black)}
+
+/* Chat */
+.chatwrap{display:grid;grid-template-columns:1fr 300px;gap:36px;align-items:start}
+.chat{border:1px solid var(--gray-150);border-radius:var(--radius);display:flex;flex-direction:column;min-height:540px}
+.chatlog{flex:1;padding:26px;display:flex;flex-direction:column;gap:18px;overflow-y:auto}
+.msg{max-width:78%;padding:13px 17px;border-radius:14px;font-size:.92rem;line-height:1.55}
+.msg.user{align-self:flex-end;background:var(--black);color:var(--white);border-bottom-right-radius:4px}
+.msg.ai{align-self:flex-start;background:var(--gray-075);border-bottom-left-radius:4px}
+.msg .srcs{margin-top:10px;font-size:.76rem;color:var(--gray-500);display:flex;gap:10px;flex-wrap:wrap}
+.msg .srcs span{border:1px solid var(--gray-150);background:var(--white);border-radius:5px;padding:2px 8px}
+.chatin{display:flex;gap:10px;padding:16px;border-top:1px solid var(--gray-150)}
+.chatin input{flex:1;border:1px solid var(--gray-150);border-radius:var(--radius-s);padding:11px 15px;font-family:var(--font);font-size:.92rem;outline:none}
+.chatin input:focus{border-color:var(--black)}
+.sugg{display:flex;flex-direction:column;gap:10px}
+.sugg h4{font-size:.95rem}
+.sugg .hint{font-size:.78rem;color:var(--gray-500);margin-bottom:4px}
+.sugg button{text-align:left;border:1px solid var(--gray-150);border-radius:var(--radius-s);padding:12px 15px;font-size:.87rem;color:var(--gray-900);line-height:1.4;background:var(--white)}
+.sugg button:hover{border-color:var(--black)}
+.roleswitch{display:flex;gap:6px;margin-bottom:10px}
+.roleswitch button{font-size:.78rem;padding:5px 12px;border-radius:20px;border:1px solid var(--gray-300);color:var(--gray-700)}
+.roleswitch button.active{background:var(--black);color:var(--white);border-color:var(--black)}
+
+/* Aufgaben */
+.pipeline{display:flex;gap:10px;margin-bottom:34px;overflow-x:auto;padding-bottom:4px}
+.pcol{min-width:170px;flex:1}
+.pcol .ph{font-size:.78rem;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-500);font-weight:500;padding-bottom:9px;border-bottom:2px solid var(--gray-150);margin-bottom:12px;display:flex;justify-content:space-between}
+.pcol.now .ph{border-color:var(--accent)}
+.opp{border:1px solid var(--gray-150);border-radius:var(--radius-s);padding:12px 14px;font-size:.84rem;line-height:1.4;margin-bottom:10px;cursor:pointer}
+.opp:hover{border-color:var(--black)}
+.opp .v{font-size:.74rem;color:var(--gray-500);margin-top:5px}
+.tasklist{display:flex;flex-direction:column;gap:12px}
+.task{border:1px solid var(--gray-150);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.task .check{width:22px;height:22px;border:1.5px solid var(--gray-300);border-radius:6px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.8rem}
+.task.done .check{background:var(--black);border-color:var(--black);color:var(--white)}
+.task.done .tt{text-decoration:line-through;color:var(--gray-500)}
+.task .tt{font-size:.95rem;font-weight:400}
+.task .who{font-size:.78rem;color:var(--gray-500)}
+.task .due{font-size:.78rem;color:var(--gray-700);margin-left:auto}
+.task .due.over{color:var(--neg);font-weight:500}
+.wfbtn{font-size:.78rem;border:1px solid var(--gray-300);border-radius:6px;padding:5px 12px;color:var(--gray-900)}
+.wfbtn:hover{border-color:var(--black)}
+.wfbtn.running{background:var(--accent-soft);border-color:var(--accent)}
+.workflow{border:1px solid var(--gray-150);border-left:3px solid var(--accent);border-radius:var(--radius);padding:22px 24px;margin-top:30px}
+.workflow h4{margin-bottom:4px}
+.workflow .wsub{font-size:.83rem;color:var(--gray-500);margin-bottom:18px}
+.wsteps{display:flex;flex-direction:column;gap:0}
+.wstep{display:flex;gap:14px;font-size:.9rem;padding:9px 0;align-items:flex-start}
+.wstep .ic{width:22px;height:22px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;margin-top:1px}
+.ic.done{background:var(--black);color:var(--white)}
+.ic.act{background:var(--accent);color:var(--black);font-weight:600}
+.ic.wait{border:1.5px solid var(--gray-300);color:var(--gray-300)}
+.wstep .st{color:var(--gray-700)} .wstep .st b{font-weight:500;color:var(--black)}
+.approve{margin-top:18px;background:var(--gray-075);border-radius:var(--radius-s);padding:18px;font-size:.9rem;line-height:1.6}
+.approve .lbl{font-size:.75rem;text-transform:uppercase;letter-spacing:.07em;color:var(--gray-500);font-weight:500;margin-bottom:8px}
+.approve .btns{display:flex;gap:10px;margin-top:14px}
+
+/* Bericht */
+.report{max-width:760px}
+.report .rhead{border-bottom:2px solid var(--black);padding-bottom:18px;margin-bottom:28px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:12px}
+.report h2{font-size:1.6rem}
+.report h3{font-size:1.05rem;margin:26px 0 10px}
+.report p{font-size:.94rem;line-height:1.65;color:var(--gray-700);margin-bottom:12px}
+.report .exec{background:var(--gray-075);border-radius:var(--radius);padding:22px 26px;font-size:.97rem;line-height:1.65}
+.statusline{display:flex;gap:8px;align-items:center;font-size:.82rem;color:var(--gray-500)}
+.freigabe{background:var(--accent-soft);border-radius:6px;padding:3px 10px;font-size:.76rem;font-weight:500;color:var(--gray-900)}
+
+/* Modal */
+.overlay{display:none;position:fixed;inset:0;background:rgba(10,10,10,.45);z-index:50;align-items:center;justify-content:center;padding:20px}
+.overlay.open{display:flex}
+.modal{background:var(--white);border-radius:16px;max-width:560px;width:100%;padding:34px;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:1.35rem;margin-bottom:6px}
+.modal .ms{font-size:.9rem;color:var(--gray-500);margin-bottom:22px}
+.modal input{width:100%;border:1px solid var(--gray-300);border-radius:var(--radius-s);padding:13px 16px;font-family:var(--font);font-size:1rem;outline:none}
+.modal input:focus{border-color:var(--black)}
+.extract{margin-top:22px;display:none}
+.extract.show{display:block}
+.extract .exrow{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--gray-075);font-size:.9rem}
+.extract .exrow .k{width:150px;color:var(--gray-500);flex-shrink:0}
+.extract .exrow .v{font-weight:400}
+.modal .btns{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+
+@media (max-width:960px){
+  .app{grid-template-columns:1fr}
+  .sidebar{position:fixed;bottom:0;top:auto;height:auto;width:100%;flex-direction:row;align-items:center;padding:10px 16px;background:var(--white);border-top:1px solid var(--gray-150);border-right:none;z-index:40;gap:8px}
+  .sidebar .logo,.sidebar .foot,.sidebar .user{display:none}
+  .nav{flex-direction:row;width:100%;justify-content:space-around}
+  .nav button{padding:8px 10px;font-size:.8rem}
+  .main{padding:0 20px 120px}
+  .radarwrap,.chatwrap,.projcharts{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar">
+  <div class="logo">Netural <span>Marktradar</span></div>
+  <nav class="nav">
+    <button class="active" data-nav="home" onclick="go('home')">Meine Kunden <span class="count">12</span></button>
+    <button data-nav="portfolio" onclick="go('portfolio')">Portfolio</button>
+    <button data-nav="aufgaben" onclick="go('home')">Aufgaben</button>
+    <button data-nav="skills" onclick="go('home')">Skills</button>
+    <button data-nav="admin" onclick="go('home')">Verwaltung</button>
+  </nav>
+  <div class="foot">
+    <div class="user">
+      <div class="avatar">AO</div>
+      <div><div class="name">Albert Ortig</div><div class="role">Account Lead</div></div>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ MAIN ============ -->
+<main class="main">
+  <div class="topbar">
+    <div class="search">🔍&nbsp; Kunden, Signale, Projekte durchsuchen …</div>
+    <button class="iconbtn" title="Benachrichtigungen">🔔<span class="dot"></span></button>
+    <button class="btn" onclick="openModal()">+ Kunde hinzufügen</button>
+  </div>
+
+  <!-- ========== SCREEN: MEINE KUNDEN ========== -->
+  <section class="screen active" id="screen-home">
+    <div class="eyebrow">Dienstag, 21. Juli 2026</div>
+    <h1 class="h-page">Guten Morgen, Albert.</h1>
+    <p class="sub">In deinen Kundenteams gibt es <b style="font-weight:500">14 neue Signale</b>, 3 Opportunities warten auf Prüfung, 2 Aufgaben sind überfällig.</p>
+
+    <div class="cards">
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>AlpenStahl AG</h3><div class="branch">Stahl &amp; Industrie · Kundenteam A</div></div><span class="newpill">6 neu</span></div>
+        <div class="signal">Mitbewerber Ferrotec kündigt digitales Serviceportal für Q4 an – direkter Bezug zum laufenden Portalprojekt.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#0A0A0A" stroke-width="1.5" points="0,20 15,18 30,19 45,14 60,15 75,10 90,12 105,6 120,8"/></svg>
+        <div class="meta"><span><b>3</b>Opportunities</span><span><b>2</b>Aufgaben offen</span><span><b>3</b>Projekte</span></div>
+      </div>
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>GreenCharge Energy</h3><div class="branch">E-Mobility · Kundenteam B</div></div><span class="newpill">4 neu</span></div>
+        <div class="signal">Neue EU-Förderlinie für Ladeinfrastruktur beschlossen – Antragsfenster öffnet im September.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#0A0A0A" stroke-width="1.5" points="0,16 15,14 30,15 45,12 60,13 75,14 90,9 105,10 120,5"/></svg>
+        <div class="meta"><span><b>2</b>Opportunities</span><span><b>1</b>Aufgabe offen</span><span><b>2</b>Projekte</span></div>
+      </div>
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>MediCare Group</h3><div class="branch">Gesundheit · Kundenteam A</div></div><span class="newpill">2 neu</span></div>
+        <div class="signal">Stellenausschreibung „Head of Digital Patient Experience“ deutet auf neue Digitalstrategie hin.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#0A0A0A" stroke-width="1.5" points="0,18 15,19 30,16 45,17 60,15 75,16 90,14 105,15 120,13"/></svg>
+        <div class="meta"><span><b>1</b>Opportunity</span><span><b>0</b>Aufgaben offen</span><span><b>1</b>Projekt</span></div>
+      </div>
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>Alpina Retail</h3><div class="branch">Handel · Kundenteam C</div></div><span class="newpill">1 neu</span></div>
+        <div class="signal">Quartalszahlen: Onlineanteil wächst auf 31 %, stationär rückläufig – Investitionsdruck im E-Commerce.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#0A0A0A" stroke-width="1.5" points="0,14 15,15 30,13 45,14 60,11 75,13 90,10 105,11 120,9"/></svg>
+        <div class="meta"><span><b>2</b>Opportunities</span><span><b>1</b>Aufgabe offen</span><span><b>2</b>Projekte</span></div>
+      </div>
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>FinNord Bank</h3><div class="branch">Finanz · Kundenteam B</div></div></div>
+        <div class="signal">DORA-Umsetzungsfrist: Aufsicht kündigt verschärfte Prüfungen der IKT-Resilienz ab 2027 an.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#B8B8B4" stroke-width="1.5" points="0,15 15,16 30,15 45,16 60,14 75,15 90,15 105,14 120,15"/></svg>
+        <div class="meta"><span><b>1</b>Opportunity</span><span><b>0</b>Aufgaben offen</span><span><b>1</b>Projekt</span></div>
+      </div>
+      <div class="card" onclick="go('customer')">
+        <div class="top"><div><h3>GlasTech Systems</h3><div class="branch">Maschinenbau · Kundenteam C</div></div><span class="newpill">1 neu</span></div>
+        <div class="signal">Übernahme eines italienischen Wettbewerbers abgeschlossen – Integration der Serviceprozesse steht an.</div>
+        <svg class="spark" width="120" height="26" viewBox="0 0 120 26"><polyline fill="none" stroke="#0A0A0A" stroke-width="1.5" points="0,17 15,15 30,16 45,13 60,14 75,11 90,12 105,9 120,10"/></svg>
+        <div class="meta"><span><b>1</b>Opportunity</span><span><b>1</b>Aufgabe offen</span><span><b>2</b>Projekte</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SCREEN: KUNDE ========== -->
+  <section class="screen" id="screen-customer">
+    <div class="crumb"><a onclick="go('home')">Meine Kunden</a> / AlpenStahl AG</div>
+    <div class="custhead">
+      <div>
+        <h1 class="h-page">AlpenStahl AG</h1>
+        <p class="sub">Stahl &amp; Industrie · DACH + Norditalien · Account Lead: Albert Ortig · <span style="color:var(--black)">Radar aktiv seit März 2026</span></p>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="btn ghost" onclick="showTab('bericht')">Monatsbericht Juli</button>
+        <button class="btn" onclick="showTab('chat')">Radar fragen</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="radar" onclick="showTab('radar')">Radar <span class="n">6 neu</span></button>
+      <button data-tab="projekte" onclick="showTab('projekte')">Projekte &amp; KPIs <span class="n">3</span></button>
+      <button data-tab="chat" onclick="showTab('chat')">Chat</button>
+      <button data-tab="aufgaben" onclick="showTab('aufgaben')">Aufgaben <span class="n">5</span></button>
+      <button data-tab="bericht" onclick="showTab('bericht')">Bericht</button>
+    </div>
+
+    <!-- ---- TAB RADAR ---- -->
+    <div class="tabpane active" id="tab-radar">
+      <div class="dims">
+        <button class="chip active">Alle <span class="c">24</span></button>
+        <button class="chip">Markt &amp; Branche <span class="c">5</span></button>
+        <button class="chip">Kunde direkt <span class="c">6</span></button>
+        <button class="chip">Mitbewerb <span class="c">4</span></button>
+        <button class="chip">Innovation <span class="c">3</span></button>
+        <button class="chip">Geschäftsebene <span class="c">2</span></button>
+        <button class="chip">Politik &amp; Regulatorik <span class="c">2</span></button>
+        <button class="chip">Internes Lagebild <span class="c">2</span></button>
+      </div>
+
+      <div class="radarwrap">
+        <div class="siglist">
+          <div class="sig">
+            <div class="head"><span class="tag new">Neu</span><span class="tag hot">Hohe Relevanz</span><span class="tag">Mitbewerb</span><span class="date">Heute, 06:40</span></div>
+            <h4>Ferrotec kündigt digitales Serviceportal für Q4 2026 an</h4>
+            <p>Der direkte Wettbewerber launcht ein Kundenportal mit Ersatzteilbestellung und Anlagenmonitoring. Deckt sich in Teilen mit dem Scope des laufenden AlpenStahl-Portalprojekts – Differenzierung über Servicetiefe möglich.</p>
+            <div class="src">Quelle: <a href="#">Pressemitteilung Ferrotec</a> · KI-Einordnung geprüft von L. Huber
+              <div class="acts"><button>Relevant</button><button>Irrelevant</button><button>→ Opportunity</button></div>
+            </div>
+          </div>
+          <div class="sig">
+            <div class="head"><span class="tag new">Neu</span><span class="tag kpi">KPI-Signal</span><span class="tag">Internes Lagebild</span><span class="date">Gestern</span></div>
+            <h4>KPI-Abweichung: Portal-Adoption unter Schwellenwert</h4>
+            <p>Die Aktivierungsrate im Kundenportal liegt mit 46 % erstmals unter dem Schwellenwert von 50 % (Ziel: 65 %). Hauptursache laut Analytics: Abbrüche bei der Erstregistrierung von Händlern.</p>
+            <div class="src">Quelle: <a href="#">Projekt Kundenportal · KPI Adoption</a>
+              <div class="acts"><button>→ Aufgabe</button><button>Details</button></div>
+            </div>
+          </div>
+          <div class="sig">
+            <div class="head"><span class="tag new">Neu</span><span class="tag">Kunde direkt</span><span class="date">Gestern</span></div>
+            <h4>AlpenStahl sucht „Digital Process Manager Logistik“</h4>
+            <p>Neue Stellenausschreibung deutet auf geplante Digitalisierung der Werkslogistik hin. Bisher kein Netural-Projekt in diesem Bereich – möglicher Anknüpfungspunkt für Analyse &amp; Strategie.</p>
+            <div class="src">Quelle: <a href="#">karriere.alpenstahl.example</a>
+              <div class="acts"><button>Relevant</button><button>Irrelevant</button><button>→ Opportunity</button></div>
+            </div>
+          </div>
+          <div class="sig">
+            <div class="head"><span class="tag">Politik &amp; Regulatorik</span><span class="date">18. Juli</span></div>
+            <h4>CBAM-Berichtspflichten werden ab 2027 erweitert</h4>
+            <p>Die EU konkretisiert die CO₂-Grenzausgleichs-Berichterstattung. Für AlpenStahl steigen Datenanforderungen entlang der Lieferkette – relevant für die Datenplattform (Phase 2).</p>
+            <div class="src">Quelle: <a href="#">EU-Kommission</a> · 2 weitere Quellen
+              <div class="acts"><button>Relevant</button><button>Irrelevant</button><button>→ Opportunity</button></div>
+            </div>
+          </div>
+          <div class="sig">
+            <div class="head"><span class="tag">Geschäftsebene</span><span class="date">15. Juli</span></div>
+            <h4>Halbjahreszahlen: Servicegeschäft wächst um 12 %</h4>
+            <p>Der Vorstand betont im Earnings Call den Ausbau digitaler Services als strategische Priorität für 2027. Investitionsbudget für Digitalisierung wurde um 20 % erhöht.</p>
+            <div class="src">Quelle: <a href="#">Geschäftsbericht H1</a>
+              <div class="acts"><button>Relevant</button><button>Irrelevant</button><button>→ Opportunity</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="aside">
+          <div class="panel">
+            <h4>Signalvolumen, 6 Monate</h4>
+            <div class="chartbox"><canvas id="chartSignals"></canvas></div>
+          </div>
+          <div class="panel">
+            <h4>Radar-Lage</h4>
+            <div class="row"><span>Neue Signale (7 Tage)</span><b>6</b></div>
+            <div class="row"><span>Hohe Relevanz</span><b>3</b></div>
+            <div class="row"><span>Offene Opportunities</span><b>3</b></div>
+            <div class="row"><span>Review-Queue</span><b>4</b></div>
+            <div class="row"><span>Nächster Bericht</span><b>1. Aug.</b></div>
+          </div>
+          <div class="panel">
+            <h4>Mitbewerber im Blick</h4>
+            <div class="row"><span>Ferrotec</span><b>2 Signale</b></div>
+            <div class="row"><span>SteelWorks Int.</span><b>1 Signal</b></div>
+            <div class="row"><span>Donau Metall</span><b>–</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- TAB PROJEKTE ---- -->
+    <div class="tabpane" id="tab-projekte">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+        <p class="sub" style="margin:0">3 laufende Projekte, synchronisiert aus Jira &amp; Projektsoftware · letzter Abgleich vor 20 Min.</p>
+        <button class="btn ghost">+ Projekt übernehmen</button>
+      </div>
+      <div class="projgrid">
+
+        <div class="proj">
+          <div class="head">
+            <h3>Kundenportal 2.0</h3>
+            <span class="status"><span class="led warn"></span>Status: Beobachten</span>
+            <span class="phase">Phase: Rollout · Meilenstein M4 am 15. Aug.</span>
+          </div>
+          <div class="desc">Serviceportal für Händler und Direktkunden: Ersatzteile, Anlagendokumentation, Störungsmeldungen. Rollout Welle 2 läuft, Adoption unter Ziel – Maßnahmenpaket Registrierung in Arbeit.</div>
+          <div class="kpis">
+            <div class="kpi"><div class="label">Portal-Adoption</div><div class="val">46 %</div><div class="delta down">▼ 4 Pkt. / Monat</div><div class="target">Ziel 65 % · Schwelle 50 %</div></div>
+            <div class="kpi"><div class="label">Ticket-Deflection</div><div class="val">31 %</div><div class="delta up">▲ 5 Pkt. / Monat</div><div class="target">Ziel 40 %</div></div>
+            <div class="kpi"><div class="label">NPS Portal</div><div class="val">+42</div><div class="delta up">▲ 6 / Quartal</div><div class="target">Ziel +45</div></div>
+            <div class="kpi"><div class="label">Budgetverbrauch</div><div class="val">68 %</div><div class="delta flat">Plan: 71 %</div><div class="target">im Rahmen</div></div>
+          </div>
+          <div class="projcharts">
+            <div class="cbox"><div class="t">Adoption vs. Ziel, 6 Monate</div><div class="ch"><canvas id="chartAdoption"></canvas></div></div>
+            <div class="cbox"><div class="t">Self-Service-Bestellungen / Monat</div><div class="ch"><canvas id="chartOrders"></canvas></div></div>
+          </div>
+          <div class="milelist">
+            <span>Nächste Meilensteine: <b>M4 Händler-Onboarding 15. Aug.</b> · M5 Go-live Italien 30. Sep.</span>
+            <span>Offene Risiken: <b>1</b></span>
+            <span>Jira: <b>23 offene Tickets</b></span>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div class="head">
+            <h3>Service-App Instandhaltung</h3>
+            <span class="status"><span class="led ok"></span>Status: Auf Kurs</span>
+            <span class="phase">Phase: Entwicklung · Sprint 14</span>
+          </div>
+          <div class="desc">Mobile App für Servicetechniker: Wartungspläne, Checklisten, Offline-Dokumentation. Pilotgruppe seit Juni aktiv.</div>
+          <div class="kpis">
+            <div class="kpi"><div class="label">Aktive Techniker</div><div class="val">87</div><div class="delta up">▲ 22 / Monat</div><div class="target">Ziel 120 (Pilot)</div></div>
+            <div class="kpi"><div class="label">Dokuzeit / Einsatz</div><div class="val">−28 %</div><div class="delta up">▲ Einsparung wächst</div><div class="target">Ziel −30 %</div></div>
+            <div class="kpi"><div class="label">Sprint-Velocity</div><div class="val">42</div><div class="delta flat">stabil</div><div class="target">Plan 40</div></div>
+            <div class="kpi"><div class="label">Termintreue</div><div class="val">96 %</div><div class="delta up">▲ 2 Pkt.</div><div class="target">Ziel 95 %</div></div>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div class="head">
+            <h3>Datenplattform Vertrieb</h3>
+            <span class="status"><span class="led ok"></span>Status: Auf Kurs</span>
+            <span class="phase">Phase: Konzeption · Kickoff Phase 2 im Sept.</span>
+          </div>
+          <div class="desc">Konsolidierte Vertriebsdaten als Basis für Forecasting und Preisanalytik. Phase 1 (Datenarchitektur) abgeschlossen, Phase 2 in Beauftragung – CBAM-Anforderungen könnten Scope erweitern.</div>
+          <div class="kpis">
+            <div class="kpi"><div class="label">Angebundene Quellsysteme</div><div class="val">4 / 6</div><div class="delta up">▲ 1 im Juli</div><div class="target">Ziel: 6 bis Q4</div></div>
+            <div class="kpi"><div class="label">Datenqualität Stammdaten</div><div class="val">91 %</div><div class="delta up">▲ 3 Pkt.</div><div class="target">Ziel 95 %</div></div>
+            <div class="kpi"><div class="label">Budgetverbrauch</div><div class="val">34 %</div><div class="delta flat">Plan: 35 %</div><div class="target">im Rahmen</div></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ---- TAB CHAT ---- -->
+    <div class="tabpane" id="tab-chat">
+      <div class="chatwrap">
+        <div class="chat">
+          <div class="chatlog" id="chatlog">
+            <div class="msg user">Was sollte ich vor dem Termin mit AlpenStahl nächste Woche wissen?</div>
+            <div class="msg ai">Drei Dinge sind für den Termin am 28. Juli wesentlich:<br><br><b>1. Ferrotec-Portal:</b> Der Mitbewerber kündigt für Q4 ein Serviceportal an. Unser Differenzierungshebel ist die Integration von Anlagenmonitoring und Ersatzteillogistik, die Ferrotec laut Ankündigung nicht abdeckt.<br><br><b>2. Adoption unter Schwelle:</b> Die Portal-Adoption liegt bei 46 % (Schwelle 50 %). Das Maßnahmenpaket zur Händler-Registrierung sollte proaktiv angesprochen werden.<br><br><b>3. Budget-Signal:</b> Im Earnings Call wurde das Digitalbudget um 20 % erhöht, Schwerpunkt digitale Services. Guter Zeitpunkt, die Logistik-Digitalisierung (neue Stellenausschreibung) als Thema zu platzieren.
+              <div class="srcs"><span>Pressemitteilung Ferrotec</span><span>KPI Portal-Adoption</span><span>Earnings Call H1</span><span>Stellenausschreibung 20.7.</span></div>
+            </div>
+          </div>
+          <div class="chatin">
+            <input id="chatInput" placeholder="Frage zu AlpenStahl stellen …" onkeydown="if(event.key==='Enter')sendChat()">
+            <button class="btn" onclick="sendChat()">Senden</button>
+          </div>
+        </div>
+        <div class="sugg">
+          <h4>Vorgeschlagene Fragen</h4>
+          <div class="hint">Basierend auf deiner Rolle und der aktuellen Lage</div>
+          <div class="roleswitch">
+            <button class="active" onclick="setRole(this,'lead')">Account Lead</button>
+            <button onclick="setRole(this,'member')">Teammitglied</button>
+            <button onclick="setRole(this,'mgmt')">Management</button>
+          </div>
+          <div id="suggList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- TAB AUFGABEN ---- -->
+    <div class="tabpane" id="tab-aufgaben">
+      <h3 style="margin-bottom:16px">Opportunity-Pipeline</h3>
+      <div class="pipeline">
+        <div class="pcol"><div class="ph">Neu <span>2</span></div>
+          <div class="opp">Logistik-Digitalisierung als Beratungsthema platzieren<div class="v">aus Signal: Stellenausschreibung · KI-Vorschlag</div></div>
+          <div class="opp">CBAM-Datenanforderungen in Datenplattform Phase 2<div class="v">aus Signal: EU-Regulatorik · KI-Vorschlag</div></div>
+        </div>
+        <div class="pcol now"><div class="ph">Geprüft <span>1</span></div>
+          <div class="opp">Portal-Differenzierung gegen Ferrotec ausarbeiten<div class="v">Verantwortlich: A. Ortig · seit 2 Tagen</div></div>
+        </div>
+        <div class="pcol"><div class="ph">In Ausarbeitung <span>1</span></div>
+          <div class="opp">Maßnahmenpaket Händler-Registrierung<div class="v">Verantwortlich: L. Huber · Workflow läuft</div></div>
+        </div>
+        <div class="pcol"><div class="ph">Beim Kunden <span>1</span></div>
+          <div class="opp">Ausbau Service-App auf Werk Donawitz<div class="v">Angebot übergeben 10. Juli</div></div>
+        </div>
+        <div class="pcol"><div class="ph">Gewonnen <span>2</span></div>
+          <div class="opp" style="opacity:.55">Datenplattform Phase 2<div class="v">Juni · 240 PT</div></div>
+        </div>
+      </div>
+
+      <h3 style="margin-bottom:16px">Aufgaben aus dem Juli-Bericht</h3>
+      <div class="tasklist">
+        <div class="task">
+          <div class="check" onclick="toggleTask(this)"></div>
+          <div><div class="tt">Wettbewerbsvergleich Ferrotec-Portal erstellen</div><div class="who">A. Ortig · aus Bericht Juli</div></div>
+          <span class="due over">Fällig gestern</span>
+          <button class="wfbtn running" onclick="scrollToWf()">Workflow läuft</button>
+        </div>
+        <div class="task">
+          <div class="check" onclick="toggleTask(this)"></div>
+          <div><div class="tt">Follow-up zu Adoption-Maßnahmen an Hr. Steiner senden</div><div class="who">L. Huber · aus KPI-Signal</div></div>
+          <span class="due">Fällig 24. Juli</span>
+          <button class="wfbtn">▶ Workflow starten</button>
+        </div>
+        <div class="task">
+          <div class="check" onclick="toggleTask(this)"></div>
+          <div><div class="tt">Kurzbriefing für Termin am 28. Juli vorbereiten</div><div class="who">M. Berger · aus Kalender</div></div>
+          <span class="due">Fällig 25. Juli</span>
+          <button class="wfbtn">▶ Workflow starten</button>
+        </div>
+        <div class="task done">
+          <div class="check" onclick="toggleTask(this)">✓</div>
+          <div><div class="tt">CBAM-Signal fachlich bewerten</div><div class="who">S. Wagner · erledigt 19. Juli</div></div>
+          <span class="due">–</span>
+        </div>
+      </div>
+
+      <div class="workflow" id="wfcard">
+        <h4>Agentischer Workflow: Wettbewerbsvergleich Ferrotec-Portal</h4>
+        <div class="wsub">Gestartet von A. Ortig · heute 07:10 · Organisations-Workflow „Wettbewerbsvergleich“</div>
+        <div class="wsteps">
+          <div class="wstep"><div class="ic done">✓</div><div class="st"><b>Signale &amp; Quellen sammeln</b> – 9 Quellen zu Ferrotec ausgewertet (Presse, Website, LinkedIn, Jobs)</div></div>
+          <div class="wstep"><div class="ic done">✓</div><div class="st"><b>Funktionsvergleich erstellen</b> – Ferrotec-Ankündigung gegen Scope Kundenportal 2.0 gemappt</div></div>
+          <div class="wstep"><div class="ic act">3</div><div class="st"><b>Entwurf zur Freigabe</b> – Vergleichsdokument liegt zur Prüfung vor</div></div>
+          <div class="wstep"><div class="ic wait">4</div><div class="st">Ablage in Google Drive &amp; Verlinkung im Radar</div></div>
+          <div class="wstep"><div class="ic wait">5</div><div class="st">Zusammenfassung in Slack-Kundenkanal posten</div></div>
+        </div>
+        <div class="approve">
+          <div class="lbl">Wartet auf deine Freigabe</div>
+          „Wettbewerbsvergleich Serviceportale: AlpenStahl Kundenportal 2.0 vs. Ferrotec (Ankündigung Q4)“ – 4 Seiten, 12 Vergleichskriterien, 3 empfohlene Differenzierungsmaßnahmen. Alle Aussagen mit Quellenangabe.
+          <div class="btns">
+            <button class="btn" onclick="approveWf(this)">Freigeben &amp; fortsetzen</button>
+            <button class="btn ghost">Entwurf öffnen</button>
+            <button class="btn ghost">Änderungen anfordern</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- TAB BERICHT ---- -->
+    <div class="tabpane" id="tab-bericht">
+      <div class="report">
+        <div class="rhead">
+          <div>
+            <div class="eyebrow">Monatsbericht</div>
+            <h2>AlpenStahl AG · Juli 2026</h2>
+          </div>
+          <div style="text-align:right">
+            <div class="statusline"><span class="freigabe">Entwurf – Freigabe ausstehend</span></div>
+            <div style="display:flex;gap:8px;margin-top:10px"><button class="btn">Freigeben</button><button class="btn ghost">PDF exportieren</button></div>
+          </div>
+        </div>
+        <div class="exec"><b style="font-weight:500">Executive Summary.</b> Der Juli war geprägt vom angekündigten Ferrotec-Serviceportal und der erstmals unter die Schwelle gefallenen Portal-Adoption (46 %). Gleichzeitig erhöht AlpenStahl das Digitalbudget um 20 % mit Fokus auf Services, und eine neue Stellenausschreibung deutet auf die Digitalisierung der Werkslogistik hin. Aus dem Vormonat wurden 4 von 5 Aufgaben abgearbeitet. Empfehlung: Differenzierung des Portals aktiv beim Kunden platzieren und das Logistikthema als Analyse-Angebot vorbereiten.</div>
+        <h3>Wichtigste Signale</h3>
+        <p><b style="font-weight:500">Mitbewerb.</b> Ferrotec kündigt für Q4 ein Serviceportal an; funktionale Überschneidung mit Kundenportal 2.0 bei Ersatzteilen, keine Abdeckung von Anlagenmonitoring. <b style="font-weight:500">Geschäftsebene.</b> Digitalbudget +20 %, Servicegeschäft +12 % im Halbjahr. <b style="font-weight:500">Regulatorik.</b> CBAM-Berichtspflichten werden 2027 erweitert, relevant für die Datenplattform.</p>
+        <h3>Projekte &amp; KPIs</h3>
+        <p>Kundenportal 2.0: Adoption 46 % (▼, unter Schwelle), Ticket-Deflection 31 % (▲), Maßnahmenpaket Registrierung in Ausarbeitung. Service-App: auf Kurs, 87 aktive Techniker, Dokuzeit −28 %. Datenplattform: Phase 1 abgeschlossen, Phase 2 startet im September.</p>
+        <h3>Opportunities &amp; Aufgaben</h3>
+        <p>3 offene Opportunities, davon 1 beim Kunden (Service-App Donawitz). Neu vorgeschlagen: Logistik-Digitalisierung, CBAM-Erweiterung Datenplattform. Abarbeitungsstand Juni-Aufgaben: 4 von 5 erledigt, 1 überfällig (Wettbewerbsvergleich, Workflow läuft).</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SCREEN: PORTFOLIO ========== -->
+  <section class="screen" id="screen-portfolio">
+    <div class="eyebrow">Management-Sicht</div>
+    <h1 class="h-page">Portfolio</h1>
+    <p class="sub">Alle Kunden im Vergleich: Marktaktivität, Opportunities, Projektgesundheit und Aufgabenstand.</p>
+    <div class="radarwrap" style="margin-top:32px">
+      <div class="panel">
+        <h4>Signale &amp; Opportunities je Kunde, 30 Tage</h4>
+        <div style="height:280px"><canvas id="chartPortfolio"></canvas></div>
+      </div>
+      <div class="aside">
+        <div class="panel">
+          <h4>Braucht Aufmerksamkeit</h4>
+          <div class="row"><span>AlpenStahl · KPI unter Schwelle</span><b>⚑</b></div>
+          <div class="row"><span>Alpina Retail · 1 Aufgabe überfällig</span><b>⚑</b></div>
+          <div class="row"><span>FinNord · Radar-Profil veraltet</span><b>⚑</b></div>
+        </div>
+        <div class="panel">
+          <h4>Portfolio gesamt</h4>
+          <div class="row"><span>Aktive Kunden</span><b>12</b></div>
+          <div class="row"><span>Offene Opportunities</span><b>17</b></div>
+          <div class="row"><span>Projekte auf Kurs</span><b>14 / 17</b></div>
+          <div class="row"><span>Berichte freigegeben (Juli)</span><b>9 / 12</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+</div>
+
+<!-- ========== MODAL: KUNDE HINZUFÜGEN ========== -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <h3>Kunde hinzufügen</h3>
+    <p class="ms">Webadresse eingeben – der Radar extrahiert daraus einen Profilvorschlag, den du prüfst und bestätigst.</p>
+    <input id="urlIn" placeholder="https://www.kunde.com" value="https://www.alpina-retail.example">
+    <div class="extract" id="extract">
+      <div class="exrow"><div class="k">Unternehmen</div><div class="v">Alpina Retail GmbH · Handel / Sport &amp; Outdoor</div></div>
+      <div class="exrow"><div class="k">Märkte</div><div class="v">Österreich, Deutschland, Schweiz · 84 Filialen + Onlineshop</div></div>
+      <div class="exrow"><div class="k">Quellen erkannt</div><div class="v">Pressebereich, Karriereseite, LinkedIn, Investor Relations</div></div>
+      <div class="exrow"><div class="k">Mitbewerber-Kandidaten</div><div class="v">SportOn, Bergzeit Retail, IntersportAlpin <span style="color:var(--gray-500)">(bitte prüfen)</span></div></div>
+      <div class="exrow"><div class="k">Strategische Themen</div><div class="v">Omnichannel, Loyalty, Nachhaltigkeitsberichterstattung</div></div>
+      <div class="exrow"><div class="k">Aus HubSpot ergänzt</div><div class="v">2 Kontakte, 1 offener Deal, Kundenteam C vorgeschlagen</div></div>
+    </div>
+    <div class="btns">
+      <button class="btn ghost" onclick="closeModal()">Abbrechen</button>
+      <button class="btn" id="extractBtn" onclick="runExtract()">Profil extrahieren</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Navigation ---------- */
+function go(s){
+  document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
+  document.getElementById('screen-'+(s==='customer'?'customer':s)).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  const nb=document.querySelector('.nav button[data-nav="'+(s==='customer'?'home':s)+'"]');
+  if(nb)nb.classList.add('active');
+  window.scrollTo(0,0);
+  if(s==='portfolio')initPortfolio();
+}
+function showTab(t){
+  document.querySelectorAll('.tabpane').forEach(e=>e.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));
+  if(t==='projekte')initProjCharts();
+}
+
+/* ---------- Chat ---------- */
+const suggestions={
+  lead:[
+    "Welche Opportunities stehen seit über 30 Tagen ohne nächsten Schritt?",
+    "Wie hat sich die Portal-Adoption seit dem Maßnahmenstart entwickelt?",
+    "Was hat Ferrotec in den letzten 90 Tagen kommuniziert?",
+    "Welche Themen sollte ich im Jahresgespräch im Oktober setzen?"
+  ],
+  member:[
+    "Was ist diese Woche passiert, das das Portalprojekt betrifft?",
+    "Welche neuen Signale sollte ich vor dem nächsten Sprint kennen?",
+    "Gibt es offene Aufgaben, die mir zugewiesen sind?",
+    "Was sagt der Kunde öffentlich zum Thema Nachhaltigkeit?"
+  ],
+  mgmt:[
+    "Bei welchen Kunden gab es diesen Monat kritische Signale?",
+    "Wo liegen die größten unbearbeiteten Opportunities im Portfolio?",
+    "Welche Projekte sind nicht auf Kurs und warum?",
+    "Wie entwickelt sich das Digitalbudget unserer Top-Kunden?"
+  ]
+};
+function renderSugg(r){
+  document.getElementById('suggList').innerHTML=suggestions[r].map(q=>`<button onclick="askSugg(this)">${q}</button>`).join('');
+}
+function setRole(btn,r){
+  document.querySelectorAll('.roleswitch button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderSugg(r);
+}
+renderSugg('lead');
+function askSugg(b){document.getElementById('chatInput').value=b.textContent;sendChat();}
+function sendChat(){
+  const inp=document.getElementById('chatInput');
+  if(!inp.value.trim())return;
+  const log=document.getElementById('chatlog');
+  log.insertAdjacentHTML('beforeend',`<div class="msg user">${inp.value}</div>`);
+  setTimeout(()=>{
+    log.insertAdjacentHTML('beforeend',`<div class="msg ai">Im fertigen Produkt beantwortet der Radar diese Frage aus allen Signalen, Berichten, Projekt- und KPI-Daten dieses Kunden – mit Quellenangaben zu jeder Aussage. <div class="srcs"><span>Demo-Prototyp</span></div></div>`);
+    log.scrollTop=log.scrollHeight;
+  },500);
+  inp.value='';log.scrollTop=log.scrollHeight;
+}
+
+/* ---------- Aufgaben ---------- */
+function toggleTask(el){el.closest('.task').classList.toggle('done');el.textContent=el.closest('.task').classList.contains('done')?'✓':'';}
+function scrollToWf(){document.getElementById('wfcard').scrollIntoView({behavior:'smooth'});}
+function approveWf(btn){
+  const box=btn.closest('.approve');
+  box.innerHTML='<div class="lbl" style="color:var(--pos)">Freigegeben</div>Der Agent setzt fort: Ablage in Google Drive, danach Zusammenfassung in den Slack-Kanal #alpenstahl. Du wirst benachrichtigt, sobald alles erledigt ist.';
+}
+
+/* ---------- Modal ---------- */
+function openModal(){document.getElementById('modal').classList.add('open');}
+function closeModal(){document.getElementById('modal').classList.remove('open');}
+function runExtract(){
+  const b=document.getElementById('extractBtn');
+  if(b.textContent==='Profil extrahieren'){
+    b.textContent='Analysiere Website …';
+    setTimeout(()=>{document.getElementById('extract').classList.add('show');b.textContent='Kunde anlegen & Radar starten';},900);
+  }else{closeModal();}
+}
+
+/* ---------- Charts ---------- */
+Chart.defaults.font.family="'Hind',sans-serif";
+Chart.defaults.color='#6E6E6E';
+Chart.defaults.font.size=11;
+const gridC={color:'#F4F4F1'};
+new Chart(document.getElementById('chartSignals'),{type:'bar',
+  data:{labels:['Feb','Mär','Apr','Mai','Jun','Jul'],datasets:[
+    {label:'Signale',data:[9,14,11,17,15,24],backgroundColor:'#0A0A0A',borderRadius:4,barPercentage:.55},
+    {label:'davon hohe Relevanz',data:[2,3,2,5,4,8],backgroundColor:'#F1BB1E',borderRadius:4,barPercentage:.55}]},
+  options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:gridC,ticks:{stepSize:10}}}}});
+let projDone=false;
+function initProjCharts(){
+  if(projDone)return;projDone=true;
+  new Chart(document.getElementById('chartAdoption'),{type:'line',
+    data:{labels:['Feb','Mär','Apr','Mai','Jun','Jul'],datasets:[
+      {label:'Adoption',data:[38,44,49,52,50,46],borderColor:'#0A0A0A',backgroundColor:'#0A0A0A',pointRadius:3,tension:.35},
+      {label:'Ziel',data:[65,65,65,65,65,65],borderColor:'#B8B8B4',borderDash:[5,4],pointRadius:0},
+      {label:'Schwelle',data:[50,50,50,50,50,50],borderColor:'#F1BB1E',borderDash:[2,3],pointRadius:0}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:gridC,min:30,max:70,ticks:{callback:v=>v+' %'}}}}});
+  new Chart(document.getElementById('chartOrders'),{type:'bar',
+    data:{labels:['Feb','Mär','Apr','Mai','Jun','Jul'],datasets:[{data:[240,310,390,470,520,610],backgroundColor:'#0A0A0A',borderRadius:4,barPercentage:.5}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:gridC}}}});
+}
+let pfDone=false;
+function initPortfolio(){
+  if(pfDone)return;pfDone=true;
+  new Chart(document.getElementById('chartPortfolio'),{type:'bar',
+    data:{labels:['AlpenStahl','GreenCharge','MediCare','Alpina Retail','FinNord','GlasTech'],datasets:[
+      {label:'Signale',data:[24,18,9,12,6,11],backgroundColor:'#0A0A0A',borderRadius:4},
+      {label:'Opportunities',data:[3,2,1,2,1,1],backgroundColor:'#F1BB1E',borderRadius:4}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:10}}},scales:{x:{grid:gridC},y:{grid:{display:false}}}}});
+}
+</script>
+</body>
+</html>

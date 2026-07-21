@@ -1,0 +1,185 @@
+// Marktradar Datenmodell – Etappe 1
+// Datenbank: PostgreSQL (z. B. Neon oder Cloud SQL), DATABASE_URL in .env.
+// pgvector für semantische Suche kommt in Etappe 6 dazu.
+// Status-/Typfelder sind bewusst Strings, gültige Werte stehen im Kommentar.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String           @id @default(cuid())
+  email       String           @unique
+  name        String
+  role        String           @default("member") // member | lead | management | admin
+  image       String?
+  memberships TeamMembership[]
+  tasks       Task[]
+  createdAt   DateTime         @default(now())
+}
+
+model Customer {
+  id            String           @id @default(cuid())
+  name          String
+  slug          String           @unique
+  industry      String
+  markets       String? // z. B. "DACH + Norditalien"
+  websiteUrl    String?
+  teamLabel     String? // z. B. "Kundenteam A"
+  profileJson   String? // Kundenprofil: Keywords, Mitbewerber, Themen (JSON)
+  radarSince    DateTime         @default(now())
+  memberships   TeamMembership[]
+  signals       Signal[]
+  projects      Project[]
+  opportunities Opportunity[]
+  tasks         Task[]
+  reports       Report[]
+  sources       Source[]
+  createdAt     DateTime         @default(now())
+}
+
+model TeamMembership {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+  isLead     Boolean  @default(false)
+
+  @@unique([userId, customerId])
+}
+
+model Source {
+  id         String   @id @default(cuid())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+  kind       String // news | website | linkedin | jobs | register | tender | internal_drive | internal_hubspot | internal_slack | internal_jira | kpi
+  label      String
+  url        String?
+  active     Boolean  @default(true)
+  signals    Signal[]
+}
+
+model Signal {
+  id          String       @id @default(cuid())
+  customer    Customer     @relation(fields: [customerId], references: [id])
+  customerId  String
+  source      Source?      @relation(fields: [sourceId], references: [id])
+  sourceId    String?
+  dimension   String // markt | kunde | mitbewerb | innovation | geschaeft | politik | intern
+  title       String
+  summary     String
+  sourceUrl   String?
+  sourceLabel String?
+  relevance   Int          @default(50) // 0–100, KI-Score
+  isNew       Boolean      @default(true)
+  isKpiSignal Boolean      @default(false)
+  review      String       @default("open") // open | relevant | irrelevant
+  occurredAt  DateTime     @default(now())
+  createdAt   DateTime     @default(now())
+  opportunity Opportunity?
+}
+
+model Opportunity {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  signal      Signal?  @relation(fields: [signalId], references: [id])
+  signalId    String?  @unique
+  title       String
+  rationale   String? // Bezug zum Netural-Leistungsportfolio
+  stage       String   @default("new") // new | reviewed | drafting | placed | won | dropped
+  ownerLabel  String?
+  tasks       Task[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Task {
+  id            String       @id @default(cuid())
+  customer      Customer     @relation(fields: [customerId], references: [id])
+  customerId    String
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  opportunityId String?
+  assignee      User?        @relation(fields: [assigneeId], references: [id])
+  assigneeId    String?
+  title         String
+  originLabel   String? // z. B. "aus Bericht Juli"
+  dueAt         DateTime?
+  status        String       @default("open") // open | done
+  workflowRun   WorkflowRun?
+  createdAt     DateTime     @default(now())
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  name        String
+  description String?
+  phase       String? // z. B. "Rollout · Meilenstein M4 am 15. Aug."
+  status      String   @default("ok") // ok | watch | critical
+  externalRef String? // Jira-Key o. ä.
+  kpis        Kpi[]
+  createdAt   DateTime @default(now())
+}
+
+model Kpi {
+  id        String     @id @default(cuid())
+  project   Project    @relation(fields: [projectId], references: [id])
+  projectId String
+  label     String
+  unit      String? // % | count | pt | eur
+  target    Float?
+  threshold Float?
+  direction String     @default("up") // up = höher ist besser, down = niedriger ist besser
+  values    KpiValue[]
+}
+
+model KpiValue {
+  id     String   @id @default(cuid())
+  kpi    Kpi      @relation(fields: [kpiId], references: [id])
+  kpiId  String
+  period DateTime // Monatsanfang
+  value  Float
+}
+
+model Report {
+  id          String    @id @default(cuid())
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  customerId  String
+  month       String // "2026-07"
+  execSummary String
+  bodyJson    String? // Abschnitte als JSON
+  status      String    @default("draft") // draft | approved
+  approvedAt  DateTime?
+  createdAt   DateTime  @default(now())
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String
+  scope       String   @default("org") // org | customer
+  customerId  String? // gesetzt bei scope=customer
+  description String?
+  promptTmpl  String?
+  outputKind  String? // report | briefing | email | slack | table
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model WorkflowRun {
+  id         String    @id @default(cuid())
+  task       Task      @relation(fields: [taskId], references: [id])
+  taskId     String    @unique
+  skillName  String
+  status     String    @default("running") // running | waiting_approval | approved | done | failed
+  stepsJson  String // Schrittliste mit Status als JSON
+  approvalAt DateTime?
+  createdAt  DateTime  @default(now())
+}
