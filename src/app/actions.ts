@@ -87,16 +87,41 @@ export async function toggleTask(taskId: string) {
   revalidatePath("/", "layout");
 }
 
-/** Freigabe eines agentischen Workflows (Kernregel 2: nichts Externes ohne Freigabe). */
+/**
+ * Freigabe eines agentischen Workflows (Kernregel 2: nichts Externes ohne Freigabe).
+ * Erst NACH der Freigabe wird ausgespielt (Slack, sofern konfiguriert);
+ * jeder Schritt bleibt im Protokoll.
+ */
 export async function approveWorkflow(runId: string) {
   const run = await db.workflowRun.findUniqueOrThrow({
     where: { id: runId },
-    include: { task: true },
+    include: { task: { include: { customer: true } } },
   });
   await requireCustomerAccess(run.task.customerId);
+  if (run.status !== "waiting_approval") return;
+
+  const { postToSlack, slackConfigured } = await import("@/lib/integrations/slack");
+  const { stepsAfterApproval } = await import("@/lib/workflows/engine");
+
+  let slack: "posted" | "skipped" = "skipped";
+  if (slackConfigured() && run.draft) {
+    try {
+      await postToSlack(
+        `*Marktradar – ${run.skillName} (${run.task.customer.name})* – freigegeben:\n${run.draft.slice(0, 2800)}`
+      );
+      slack = "posted";
+    } catch {
+      // Slack-Fehler: Freigabe bleibt gültig, Schritt bleibt als übersprungen dokumentiert
+    }
+  }
+
   await db.workflowRun.update({
     where: { id: runId },
-    data: { status: "approved", approvalAt: new Date() },
+    data: {
+      status: "done",
+      approvalAt: new Date(),
+      stepsJson: JSON.stringify(stepsAfterApproval(slack)),
+    },
   });
   revalidatePath("/", "layout");
 }

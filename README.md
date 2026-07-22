@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappen 1-7 abgeschlossen.
+Alle 8 Etappen abgeschlossen.
+
+**Workflows (Etappe 8):** Skill-Framework aus der DB (Name, Beschreibung, Prompt-Template, Output-Art – neue Workflows ohne Deployment). Auf jeder offenen Aufgabe lässt sich ein Workflow starten (Skill-Auswahl: Meeting-Briefing, Wettbewerbsvergleich, Follow-up). Der Lauf sammelt Radar-Material (gleiches Retrieval wie der Chat), Claude erzeugt einen Entwurf mit Quellenangaben, jeder Schritt wird protokolliert. Kernregel 2: Ausspielung (Slack) erst nach expliziter menschlicher Freigabe; ohne Slack-Konfiguration wird der Schritt dokumentiert übersprungen. Entwurf ist vor der Freigabe einsehbar.
 
 **Integrationen (Etappe 7):** alles optional und env-gated – ohne Konfiguration bleibt die App voll funktionsfähig, Buttons sind ausgeblendet. Slack (SLACK_WEBHOOK_URL): tägliche Pipeline-Zusammenfassung als Notification; auch Ausspielkanal für freigegebene Workflows (Etappe 8). HubSpot (HUBSPOT_TOKEN, Private App): qualifizierte Opportunities per Klick als Deal übergeben (Konzept 4.3), Deal-ID wird an der Opportunity gespeichert. KPI-Import: CSV je Projekt (kpi;periode;wert) im Projekte-Tab – importierte Werte fließen in Charts, Berichte und die KPI-Schwellenprüfung (Kernregel 5). Slack/HubSpot sind gegen die offiziellen APIs implementiert, aber mangels Test-Accounts noch nicht gegen echte Endpunkte verifiziert. Google Drive und Jira-Sync folgen, sobald OAuth bzw. eine Jira-Instanz bereitstehen.
 
@@ -59,4 +61,4 @@ Login & Rechte (nachgezogen aus Etappe 1):
 
 Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
-Nächster Schritt laut `CLAUDE.md`: Etappe 8, Workflows (Skill-Framework, Meeting-Briefing, Follow-up, Wettbewerbsvergleich, Freigabe-UI).
+Der Etappenplan aus `CLAUDE.md` ist damit vollständig umgesetzt. Offene Ausbaustufen: pgvector-Embeddings für das Chat-Retrieval (Embedding-Provider-Key nötig), Google-Drive- und Jira-Integration (OAuth/Instanz), PWA/Web-Push, EN-Lokalisierung.

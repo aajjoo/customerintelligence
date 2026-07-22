@@ -52,8 +52,11 @@ export type WorkflowDTO = {
   skillName: string;
   status: string;
   steps: WorkflowStepDTO[];
+  draft: string | null;
   taskTitle: string;
 };
+
+export type SkillDTO = { id: string; name: string; description: string | null };
 
 export type TaskDTO = {
   id: string;
@@ -100,6 +103,8 @@ export type CustomerDTO = {
   monthly: { label: string; total: number; hot: number }[];
   /** Etappe 7: welche Integrationen konfiguriert sind (steuert UI-Buttons) */
   integrations: { hubspot: boolean };
+  /** Etappe 8: verfügbare Organisations-Skills für Workflows */
+  skills: SkillDTO[];
   now: string;
 };
 

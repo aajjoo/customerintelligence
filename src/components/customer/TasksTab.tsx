@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import type { CustomerDTO, WorkflowDTO } from "@/components/customer/types";
 import { approveWorkflow, handOffToHubspot, toggleTask } from "@/app/actions";
@@ -8,6 +9,7 @@ import { PIPELINE_STAGES } from "@/lib/i18n";
 
 // Tab Aufgaben: Opportunity-Pipeline (5 Spalten), Aufgabenliste mit Fälligkeit,
 // Workflow-Karte mit Schrittfolge und Freigabe-Block (Kernregel 2: Freigabe ist explizit).
+// Etappe 8: Workflows starten per Skill-Auswahl; Entwurf einsehbar; Ausspielung erst nach Freigabe.
 
 export default function TasksTab({ customer }: { customer: CustomerDTO }) {
   const now = new Date(customer.now);
@@ -17,6 +19,11 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
   const [approved, setApproved] = useState(false);
   const [handedOff, setHandedOff] = useState<Record<string, string>>({});
   const [hubspotError, setHubspotError] = useState<string | null>(null);
+  const router = useRouter();
+  const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
+  const [startingTask, setStartingTask] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [showDraft, setShowDraft] = useState(false);
 
   const workflow = customer.tasks.map((t) => t.workflow).find(Boolean) as
     | WorkflowDTO
@@ -38,6 +45,26 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
   function approve(runId: string) {
     setApproved(true);
     startTransition(() => approveWorkflow(runId));
+  }
+
+  async function startWorkflow(taskId: string, skillId: string) {
+    setSkillPickerFor(null);
+    setWorkflowError(null);
+    setStartingTask(taskId);
+    try {
+      const res = await fetch("/api/workflows/start", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ taskId, skillId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Workflow fehlgeschlagen");
+      router.refresh();
+    } catch (e) {
+      setWorkflowError(e instanceof Error ? e.message : "Workflow fehlgeschlagen");
+    } finally {
+      setStartingTask(null);
+    }
   }
 
   function toHubspot(oppId: string) {
@@ -149,19 +176,39 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
                     className="rounded-md border border-accent bg-accent-soft px-3 py-[5px] text-[0.78rem] text-gray-900"
                     onClick={() => wfRef.current?.scrollIntoView({ behavior: "smooth" })}
                   >
-                    Workflow läuft
+                    {t.workflow.status === "done" ? "Workflow abgeschlossen" : "Workflow läuft"}
                   </button>
                 ) : (
-                  <button
-                    className="rounded-md border border-gray-300 px-3 py-[5px] text-[0.78rem] text-gray-900 hover:border-ink"
-                    title="Workflow-Framework folgt in Etappe 8"
-                  >
-                    ▶ Workflow starten
-                  </button>
+                  <span className="relative">
+                    <button
+                      className="rounded-md border border-gray-300 px-3 py-[5px] text-[0.78rem] text-gray-900 hover:border-ink disabled:opacity-50"
+                      onClick={() => setSkillPickerFor(skillPickerFor === t.id ? null : t.id)}
+                      disabled={startingTask !== null}
+                    >
+                      {startingTask === t.id ? "Workflow startet …" : "▶ Workflow starten"}
+                    </button>
+                    {skillPickerFor === t.id && (
+                      <span className="absolute right-0 top-8 z-10 w-[280px] rounded-card border border-gray-150 bg-paper p-2 shadow-lg">
+                        {customer.skills.map((s) => (
+                          <button
+                            key={s.id}
+                            className="block w-full rounded-el px-3 py-2 text-left text-[0.84rem] hover:bg-gray-75"
+                            onClick={() => startWorkflow(t.id, s.id)}
+                          >
+                            <span className="font-medium">{s.name}</span>
+                            {s.description && (
+                              <span className="block text-[0.74rem] text-gray-500">{s.description}</span>
+                            )}
+                          </button>
+                        ))}
+                      </span>
+                    )}
+                  </span>
                 ))}
             </div>
           );
         })}
+        {workflowError && <p className="text-[0.82rem] text-neg">{workflowError}</p>}
         {customer.tasks.length === 0 && (
           <p className="py-8 text-center text-[0.9rem] text-gray-500">Keine Aufgaben.</p>
         )}
@@ -204,14 +251,24 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
             ))}
           </div>
 
+          {workflow.draft && (showDraft || workflow.status === "done") && (
+            <div className="mt-[18px] rounded-el border border-gray-150 bg-paper p-[18px]">
+              <div className="mb-2 text-[0.75rem] font-medium uppercase tracking-[0.07em] text-gray-500">
+                Entwurf
+              </div>
+              <div className="whitespace-pre-line text-[0.9rem] leading-relaxed text-gray-900">
+                {workflow.draft}
+              </div>
+            </div>
+          )}
+
           {workflow.status === "waiting_approval" && !approved && (
             <div className="mt-[18px] rounded-el bg-gray-75 p-[18px] text-[0.9rem] leading-relaxed">
               <div className="mb-2 text-[0.75rem] font-medium uppercase tracking-[0.07em] text-gray-500">
                 Wartet auf deine Freigabe
               </div>
-              „{workflow.skillName}: {workflow.taskTitle}“ –{" "}
-              {workflow.steps.find((s) => s.status === "active")?.note ?? "Entwurf liegt vor"}.
-              Alle Aussagen mit Quellenangabe. Ohne Freigabe verlässt nichts das System.
+              „{workflow.skillName}: {workflow.taskTitle}“ – Entwurf liegt vor, alle Aussagen mit
+              Quellenangabe. Ohne Freigabe verlässt nichts das System (Kernregel 2).
               <div className="mt-3.5 flex flex-wrap gap-2.5">
                 <button
                   className="rounded-el bg-ink px-5 py-2.5 text-[0.9rem] font-medium text-paper hover:bg-gray-900"
@@ -221,26 +278,28 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
                 </button>
                 <button
                   className="rounded-el border border-gray-300 px-5 py-2.5 text-[0.9rem] font-medium hover:bg-paper"
-                  title="Entwurfsansicht folgt in Etappe 8"
+                  onClick={() => setShowDraft(!showDraft)}
                 >
-                  Entwurf öffnen
-                </button>
-                <button
-                  className="rounded-el border border-gray-300 px-5 py-2.5 text-[0.9rem] font-medium hover:bg-paper"
-                  title="Folgt in Etappe 8"
-                >
-                  Änderungen anfordern
+                  {showDraft ? "Entwurf schließen" : "Entwurf öffnen"}
                 </button>
               </div>
             </div>
           )}
-          {(workflow.status === "approved" || approved) && (
+          {workflow.status === "failed" && (
+            <div className="mt-[18px] rounded-el bg-gray-75 p-[18px] text-[0.9rem] leading-relaxed">
+              <div className="mb-2 text-[0.75rem] font-medium uppercase tracking-[0.07em] text-neg">
+                Fehlgeschlagen
+              </div>
+              Der Lauf konnte nicht abgeschlossen werden – über „Workflow starten“ neu anstoßen.
+            </div>
+          )}
+          {(workflow.status === "done" || approved) && workflow.status !== "failed" && (
             <div className="mt-[18px] rounded-el bg-gray-75 p-[18px] text-[0.9rem] leading-relaxed">
               <div className="mb-2 text-[0.75rem] font-medium uppercase tracking-[0.07em] text-pos">
-                Freigegeben
+                Freigegeben & abgeschlossen
               </div>
-              Die Folgeschritte werden ausgeführt, sobald das Workflow-Framework (Etappe 8) die
-              Anbindungen übernimmt. Der Lauf bleibt vollständig protokolliert.
+              {workflow.steps[3]?.note ?? "Ausspielung ausgeführt"} · der Lauf ist vollständig
+              protokolliert.
             </div>
           )}
         </div>

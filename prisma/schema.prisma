@@ -213,7 +213,8 @@ model WorkflowRun {
   taskId     String    @unique
   skillName  String
   status     String    @default("running") // running | waiting_approval | approved | done | failed
-  stepsJson  String // Schrittliste mit Status als JSON
+  stepsJson  String // Schrittliste mit Status als JSON (Protokoll, Kernregel 2)
+  draft      String? // von Claude erzeugter Entwurf (Briefing/Vergleich/E-Mail)
   approvalAt DateTime?
   createdAt  DateTime  @default(now())
 }

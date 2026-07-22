@@ -186,9 +186,9 @@ async function main() {
   // Organisations-Skills
   await db.skill.createMany({
     data: [
-      { name: "Meeting-Briefing", scope: "org", description: "Fasst vor einem Kundentermin relevante Entwicklungen und offene Punkte zusammen.", outputKind: "briefing" },
-      { name: "Wettbewerbsvergleich", scope: "org", description: "Stellt digitale Aktivitäten des Kunden denen der Mitbewerber gegenüber.", outputKind: "report" },
-      { name: "Follow-up", scope: "org", description: "Entwirft eine Follow-up-E-Mail auf Basis von Signal und Historie.", outputKind: "email" },
+      { name: "Meeting-Briefing", scope: "org", description: "Fasst vor einem Kundentermin relevante Entwicklungen und offene Punkte zusammen.", outputKind: "briefing", promptTmpl: "Erstelle ein kompaktes Meeting-Briefing zur Vorbereitung eines Kundentermins: 1) Lage in drei Sätzen, 2) die wichtigsten Entwicklungen seit dem letzten Kontakt, 3) offene Punkte und Empfehlungen für das Gespräch." },
+      { name: "Wettbewerbsvergleich", scope: "org", description: "Stellt digitale Aktivitäten des Kunden denen der Mitbewerber gegenüber.", outputKind: "report", promptTmpl: "Erstelle einen Wettbewerbsvergleich: stelle die digitalen Aktivitäten des Kunden denen der im Material genannten Mitbewerber gegenüber (Funktionsumfang, Timing, Positionierung) und leite 2-3 Differenzierungsmaßnahmen mit Bezug zum Netural-Leistungsportfolio ab." },
+      { name: "Follow-up", scope: "org", description: "Entwirft eine Follow-up-E-Mail auf Basis von Signal und Historie.", outputKind: "email", promptTmpl: "Entwirf eine professionelle, kurze Follow-up-E-Mail an den Kunden (deutsch, Sie-Form) mit Bezug auf die relevanten Entwicklungen aus dem Material. Betreff + 3-5 Sätze + konkreter nächster Schritt." },
     ],
   });
 

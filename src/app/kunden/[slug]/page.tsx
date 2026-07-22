@@ -29,6 +29,10 @@ export default async function CustomerPage({ params }: { params: { slug: string 
   const globalNew = await db.signal.count({
     where: { isNew: true, customer: accessWhere },
   });
+  const skills = await db.skill.findMany({
+    where: { active: true, scope: "org" },
+    orderBy: { name: "asc" },
+  });
   const customer = await db.customer.findFirst({
     where: { slug: params.slug, ...accessWhere },
     include: {
@@ -133,6 +137,7 @@ export default async function CustomerPage({ params }: { params: { slug: string 
               skillName: t.workflowRun.skillName,
               status: t.workflowRun.status,
               steps,
+              draft: t.workflowRun.draft,
               taskTitle: t.title,
             }
           : null,
@@ -168,6 +173,7 @@ export default async function CustomerPage({ params }: { params: { slug: string 
     }),
     monthly,
     integrations: { hubspot: !!process.env.HUBSPOT_TOKEN },
+    skills: skills.map((s) => ({ id: s.id, name: s.name, description: s.description })),
     now: now.toISOString(),
   };
 
