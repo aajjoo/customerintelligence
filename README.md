@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappen 1-5 abgeschlossen: UI-Kern, Login/Rechte, Pipeline v1, Kunden-Onboarding und Monatsbericht + Aufgaben.
+Etappen 1-6 abgeschlossen.
+
+**Chat (Etappe 6):** Fragen an den Radar je Kunde über /api/chat. Retrieval v1 über Postgres-Volltextsuche (deutsch) + Recency über Signale, Berichte, Projekte/KPIs, Opportunities und Aufgaben; Claude beantwortet ausschließlich aus dem Material und liefert Quellen-Chips (Kernregel 1: keine Aussage ohne Quelle, fehlendes Material wird explizit benannt). Gesprächsverlauf gespeichert je Kunde und User (ChatMessage). Die Retrieval-Schnittstelle ist für pgvector-Embeddings vorbereitet (z. B. Voyage) – dafür wird ein Embedding-Provider-Key benötigt, Anthropic bietet keine Embeddings-API.
 
 **Monatsbericht + Aufgaben (Etappe 5):** Claude generiert je Kunde einen Monatsbericht (Executive Summary, wichtigste Signale je Dimension mit Quellen, Projekte & KPIs, Opportunities & Aufgaben, Entwicklung ggü. Vormonat) plus empfohlene Maßnahmen – automatisch am Monatsersten im Cron oder manuell im Bericht-Tab. Freigabe nur durch den Account Lead (bzw. Management/Admin); dabei werden die Maßnahmen als Aufgaben mit Fälligkeit angelegt ("aus Bericht X"). Freigegebene Berichte sind archiviert (ein Bericht je Kunde+Monat) und als PDF exportierbar (/api/berichte/[id]/pdf, pdf-lib). Überfällige Aufgaben erzeugen im täglichen Lauf einmalig ein Erinnerungs-Signal (ab 1 Tag) bzw. Eskalations-Signal (ab 3 Tagen) im Internen Lagebild.
 
@@ -55,4 +57,4 @@ Login & Rechte (nachgezogen aus Etappe 1):
 
 Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
-Nächster Schritt laut `CLAUDE.md`: Etappe 6, Chat (RAG über Signale/Berichte/Projekte mit pgvector, Quellen-Chips, Fragevorschläge).
+Nächster Schritt laut `CLAUDE.md`: Etappe 7, Integrationen (HubSpot, Slack, Google Drive, Jira, KPI-Import).

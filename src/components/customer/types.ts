@@ -74,6 +74,12 @@ export type ReportDTO = {
   suggestedTasks: { title: string; dueInDays: number; reason: string }[] | null;
 } | null;
 
+export type ChatMessageDTO = {
+  role: "user" | "assistant";
+  content: string;
+  sources: string[];
+};
+
 export type CustomerDTO = {
   id: string;
   name: string;
@@ -89,6 +95,7 @@ export type CustomerDTO = {
   opportunities: OpportunityDTO[];
   tasks: TaskDTO[];
   report: ReportDTO;
+  chatHistory: ChatMessageDTO[];
   monthly: { label: string; total: number; hot: number }[];
   now: string;
 };

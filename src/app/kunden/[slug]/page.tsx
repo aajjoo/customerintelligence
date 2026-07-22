@@ -21,6 +21,11 @@ export default async function CustomerPage({ params }: { params: { slug: string 
   const session = await getServerSession(authOptions);
   const user = session!.user;
   const accessWhere = customerWhereForUser(user.id, user.role);
+  const chatHistory = await db.chatMessage.findMany({
+    where: { customer: { slug: params.slug }, userId: user.id },
+    orderBy: { createdAt: "asc" },
+    take: 40,
+  });
   const globalNew = await db.signal.count({
     where: { isNew: true, customer: accessWhere },
   });
@@ -151,6 +156,15 @@ export default async function CustomerPage({ params }: { params: { slug: string 
           };
         })()
       : null,
+    chatHistory: chatHistory.map((m) => {
+      let sources: string[] = [];
+      try {
+        sources = JSON.parse(m.sourcesJson ?? "[]");
+      } catch {
+        // Nachrichten ohne Quellen (User-Fragen)
+      }
+      return { role: m.role as "user" | "assistant", content: m.content, sources };
+    }),
     monthly,
     now: now.toISOString(),
   };

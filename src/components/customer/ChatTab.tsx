@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CustomerDTO } from "@/components/customer/types";
+import type { ChatMessageDTO, CustomerDTO } from "@/components/customer/types";
 
-// Tab Chat: Verlauf mit Quellen-Chips, Fragevorschläge mit Rollen-Umschalter.
-// Die Antworten werden in Etappe 2 deterministisch aus den Seed-Daten gebaut
-// (jede Aussage mit Quelle, Kernregel 1); RAG über pgvector folgt in Etappe 6.
-
-type Msg = { who: "user" | "ai"; text: React.ReactNode; sources?: string[] };
+// Tab Chat (Etappe 6, Konzept 4.5): Fragen an den Radar. Antworten kommen aus
+// /api/chat (Retrieval über Signale/Berichte/Projekte/Opportunities + Claude),
+// jede Antwort trägt Quellen-Chips (Kernregel 1). Verlauf je Kunde und User.
 
 const SUGGESTIONS: Record<string, string[]> = {
   lead: [
@@ -26,7 +24,7 @@ const SUGGESTIONS: Record<string, string[]> = {
     "Gab es diesen Monat kritische Signale?",
     "Wo liegen die größten unbearbeiteten Opportunities?",
     "Welche Projekte sind nicht auf Kurs und warum?",
-    "Wie entwickelt sich das Digitalbudget dieses Kunden?",
+    "Wie ist die Gesamtlage bei diesem Kunden?",
   ],
 };
 
@@ -37,80 +35,65 @@ const ROLES = [
 ];
 
 export default function ChatTab({ customer }: { customer: CustomerDTO }) {
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<ChatMessageDTO[]>(customer.chatHistory);
   const [input, setInput] = useState("");
   const [role, setRole] = useState("lead");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     logRef.current?.scrollTo(0, logRef.current.scrollHeight);
-  }, [msgs]);
+  }, [msgs, pending]);
 
-  function buildAnswer(): Msg {
-    // Kompakte Lage aus den relevantesten Signalen; Quellen-Chips aus deren Quellenangaben.
-    const top = customer.signals
-      .filter((s) => s.review !== "irrelevant")
-      .sort((a, b) => b.relevance - a.relevance)
-      .slice(0, 3);
-    if (top.length === 0) {
-      return {
-        who: "ai",
-        text: "Für diesen Kunden liegen noch keine Signale vor. Sobald der Radar Quellen auswertet, beantworte ich Fragen zur Lage – jede Aussage mit Quellenangabe.",
-      };
-    }
-    return {
-      who: "ai",
-      text: (
-        <>
-          Das sind die aktuell relevantesten Punkte bei {customer.name}:
-          {top.map((s, i) => (
-            <p key={s.id} className="mt-2.5">
-              <b className="font-medium">
-                {i + 1}. {s.title}:
-              </b>{" "}
-              {s.summary}
-            </p>
-          ))}
-          <p className="mt-2.5 text-gray-500">
-            Vollständige Antworten aus allen Signalen, Berichten, Projekt- und KPI-Daten (RAG)
-            folgen in Etappe 6.
-          </p>
-        </>
-      ),
-      sources: Array.from(new Set(top.map((s) => s.sourceLabel).filter(Boolean))) as string[],
-    };
-  }
-
-  function send(text?: string) {
-    const q = (text ?? input).trim();
-    if (!q) return;
+  async function send(text?: string) {
+    const question = (text ?? input).trim();
+    if (!question || pending) return;
     setInput("");
-    setMsgs((m) => [...m, { who: "user", text: q }]);
-    setTimeout(() => setMsgs((m) => [...m, buildAnswer()]), 400);
+    setError(null);
+    setMsgs((m) => [...m, { role: "user", content: question, sources: [] }]);
+    setPending(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ customerId: customer.id, question }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Antwort fehlgeschlagen");
+      setMsgs((m) => [
+        ...m,
+        { role: "assistant", content: data.answer, sources: data.sources ?? [] },
+      ]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Antwort fehlgeschlagen");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <div className="grid items-start gap-9 lg:grid-cols-[1fr_300px]">
       <div className="flex min-h-[540px] flex-col rounded-card border border-gray-150">
-        <div ref={logRef} className="flex flex-1 flex-col gap-[18px] overflow-y-auto p-[26px]">
+        <div ref={logRef} className="flex max-h-[600px] flex-1 flex-col gap-[18px] overflow-y-auto p-[26px]">
           {msgs.length === 0 && (
             <div className="max-w-[78%] self-start rounded-[14px] rounded-bl-[4px] bg-gray-75 px-[17px] py-[13px] text-[0.92rem] leading-relaxed">
-              Frag den Radar zur Lage bei {customer.name} – zu Signalen, Projekten, KPIs oder
-              Aufgaben. Jede Antwort trägt Quellenangaben.
+              Frag den Radar zur Lage bei {customer.name} – zu Signalen, Projekten, KPIs,
+              Opportunities oder Aufgaben. Jede Antwort trägt Quellenangaben.
             </div>
           )}
           {msgs.map((m, i) => (
             <div
               key={i}
-              className={`max-w-[78%] rounded-[14px] px-[17px] py-[13px] text-[0.92rem] leading-relaxed ${
-                m.who === "user"
+              className={`max-w-[78%] whitespace-pre-line rounded-[14px] px-[17px] py-[13px] text-[0.92rem] leading-relaxed ${
+                m.role === "user"
                   ? "self-end rounded-br-[4px] bg-ink text-paper"
                   : "self-start rounded-bl-[4px] bg-gray-75"
               }`}
             >
-              {m.text}
-              {m.sources && m.sources.length > 0 && (
-                <div className="mt-2.5 flex flex-wrap gap-2.5 text-[0.76rem] text-gray-500">
+              {m.content}
+              {m.sources.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-2 text-[0.76rem] text-gray-500">
                   {m.sources.map((s) => (
                     <span key={s} className="rounded-[5px] border border-gray-150 bg-paper px-2 py-0.5">
                       {s}
@@ -120,6 +103,12 @@ export default function ChatTab({ customer }: { customer: CustomerDTO }) {
               )}
             </div>
           ))}
+          {pending && (
+            <div className="max-w-[78%] self-start rounded-[14px] rounded-bl-[4px] bg-gray-75 px-[17px] py-[13px] text-[0.92rem] text-gray-500">
+              Der Radar durchsucht Signale, Berichte und Projekte …
+            </div>
+          )}
+          {error && <p className="text-[0.85rem] text-neg">{error}</p>}
         </div>
         <div className="flex gap-2.5 border-t border-gray-150 p-4">
           <input
@@ -128,10 +117,12 @@ export default function ChatTab({ customer }: { customer: CustomerDTO }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
+            disabled={pending}
           />
           <button
-            className="rounded-el bg-ink px-5 py-2.5 text-[0.9rem] font-medium text-paper hover:bg-gray-900"
+            className="rounded-el bg-ink px-5 py-2.5 text-[0.9rem] font-medium text-paper hover:bg-gray-900 disabled:opacity-50"
             onClick={() => send()}
+            disabled={pending || !input.trim()}
           >
             Senden
           </button>
@@ -162,7 +153,8 @@ export default function ChatTab({ customer }: { customer: CustomerDTO }) {
           <button
             key={q}
             onClick={() => send(q)}
-            className="rounded-el border border-gray-150 bg-paper px-[15px] py-3 text-left text-[0.87rem] leading-[1.4] text-gray-900 hover:border-ink"
+            disabled={pending}
+            className="rounded-el border border-gray-150 bg-paper px-[15px] py-3 text-left text-[0.87rem] leading-[1.4] text-gray-900 hover:border-ink disabled:opacity-50"
           >
             {q}
           </button>

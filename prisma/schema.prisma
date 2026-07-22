@@ -39,6 +39,7 @@ model Customer {
   opportunities Opportunity[]
   tasks         Task[]
   reports       Report[]
+  chatMessages  ChatMessage[]
   sources       Source[]
   createdAt     DateTime         @default(now())
 }
@@ -178,6 +179,20 @@ model Skill {
   outputKind  String? // report | briefing | email | slack | table
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
+}
+
+// Chat-Verlauf je Kunde und User (Konzept 4.5); Antworten tragen Quellen (Kernregel 1)
+model ChatMessage {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  userId      String
+  role        String // user | assistant
+  content     String
+  sourcesJson String? // Quellen-Chips der Antwort als JSON-Array
+  createdAt   DateTime @default(now())
+
+  @@index([customerId, userId, createdAt])
 }
 
 // Protokoll je Pipeline-Lauf (Konzept Kap. 9: Verarbeitung nachvollziehbar)
