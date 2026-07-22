@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import type { CustomerDTO, WorkflowDTO } from "@/components/customer/types";
-import { approveWorkflow, toggleTask } from "@/app/actions";
+import { approveWorkflow, handOffToHubspot, toggleTask } from "@/app/actions";
 import { fmtDue } from "@/lib/format";
 import { PIPELINE_STAGES } from "@/lib/i18n";
 
@@ -15,6 +15,8 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
   const [, startTransition] = useTransition();
   const [doneOverride, setDoneOverride] = useState<Record<string, boolean>>({});
   const [approved, setApproved] = useState(false);
+  const [handedOff, setHandedOff] = useState<Record<string, string>>({});
+  const [hubspotError, setHubspotError] = useState<string | null>(null);
 
   const workflow = customer.tasks.map((t) => t.workflow).find(Boolean) as
     | WorkflowDTO
@@ -36,6 +38,18 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
   function approve(runId: string) {
     setApproved(true);
     startTransition(() => approveWorkflow(runId));
+  }
+
+  function toHubspot(oppId: string) {
+    setHubspotError(null);
+    startTransition(async () => {
+      try {
+        const { dealId } = await handOffToHubspot(oppId);
+        setHandedOff((h) => ({ ...h, [oppId]: dealId }));
+      } catch (e) {
+        setHubspotError(e instanceof Error ? e.message : "HubSpot-Übergabe fehlgeschlagen");
+      }
+    });
   }
 
   return (
@@ -64,12 +78,33 @@ export default function TasksTab({ customer }: { customer: CustomerDTO }) {
                   <div className="mt-[5px] text-[0.74rem] text-gray-500">
                     {o.ownerLabel ? `Verantwortlich: ${o.ownerLabel}` : (o.rationale ?? "")}
                   </div>
+                  {/* Etappe 7: qualifizierte Opportunities an HubSpot übergeben (Konzept 4.3) */}
+                  {(o.hubspotDealId || handedOff[o.id]) ? (
+                    <div className="mt-1.5 text-[0.72rem] font-medium text-pos">
+                      ✓ HubSpot-Deal {o.hubspotDealId ?? handedOff[o.id]}
+                    </div>
+                  ) : (
+                    customer.integrations.hubspot &&
+                    ["reviewed", "drafting", "placed"].includes(o.stage) && (
+                      <button
+                        className="mt-1.5 rounded border border-gray-150 px-2 py-0.5 text-[0.72rem] text-gray-700 hover:border-ink"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toHubspot(o.id);
+                        }}
+                      >
+                        → An HubSpot übergeben
+                      </button>
+                    )
+                  )}
                 </div>
               ))}
             </div>
           );
         })}
       </div>
+
+      {hubspotError && <p className="-mt-4 mb-4 text-[0.82rem] text-neg">{hubspotError}</p>}
 
       <h3 className="mb-4 text-[1.05rem]">Aufgaben</h3>
       <div className="flex flex-col gap-3">

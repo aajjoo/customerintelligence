@@ -108,6 +108,7 @@ export default async function CustomerPage({ params }: { params: { slug: string 
       stage: o.stage,
       ownerLabel: o.ownerLabel,
       rationale: o.rationale,
+      hubspotDealId: o.hubspotDealId,
       updatedAt: o.updatedAt.toISOString(),
     })),
     tasks: customer.tasks.map((t) => {
@@ -166,6 +167,7 @@ export default async function CustomerPage({ params }: { params: { slug: string 
       return { role: m.role as "user" | "assistant", content: m.content, sources };
     }),
     monthly,
+    integrations: { hubspot: !!process.env.HUBSPOT_TOKEN },
     now: now.toISOString(),
   };
 

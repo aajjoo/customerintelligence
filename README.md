@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappen 1-6 abgeschlossen.
+Etappen 1-7 abgeschlossen.
+
+**Integrationen (Etappe 7):** alles optional und env-gated – ohne Konfiguration bleibt die App voll funktionsfähig, Buttons sind ausgeblendet. Slack (SLACK_WEBHOOK_URL): tägliche Pipeline-Zusammenfassung als Notification; auch Ausspielkanal für freigegebene Workflows (Etappe 8). HubSpot (HUBSPOT_TOKEN, Private App): qualifizierte Opportunities per Klick als Deal übergeben (Konzept 4.3), Deal-ID wird an der Opportunity gespeichert. KPI-Import: CSV je Projekt (kpi;periode;wert) im Projekte-Tab – importierte Werte fließen in Charts, Berichte und die KPI-Schwellenprüfung (Kernregel 5). Slack/HubSpot sind gegen die offiziellen APIs implementiert, aber mangels Test-Accounts noch nicht gegen echte Endpunkte verifiziert. Google Drive und Jira-Sync folgen, sobald OAuth bzw. eine Jira-Instanz bereitstehen.
 
 **Chat (Etappe 6):** Fragen an den Radar je Kunde über /api/chat. Retrieval v1 über Postgres-Volltextsuche (deutsch) + Recency über Signale, Berichte, Projekte/KPIs, Opportunities und Aufgaben; Claude beantwortet ausschließlich aus dem Material und liefert Quellen-Chips (Kernregel 1: keine Aussage ohne Quelle, fehlendes Material wird explizit benannt). Gesprächsverlauf gespeichert je Kunde und User (ChatMessage). Die Retrieval-Schnittstelle ist für pgvector-Embeddings vorbereitet (z. B. Voyage) – dafür wird ein Embedding-Provider-Key benötigt, Anthropic bietet keine Embeddings-API.
 
@@ -57,4 +59,4 @@ Login & Rechte (nachgezogen aus Etappe 1):
 
 Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
-Nächster Schritt laut `CLAUDE.md`: Etappe 7, Integrationen (HubSpot, Slack, Google Drive, Jira, KPI-Import).
+Nächster Schritt laut `CLAUDE.md`: Etappe 8, Workflows (Skill-Framework, Meeting-Briefing, Follow-up, Wettbewerbsvergleich, Freigabe-UI).

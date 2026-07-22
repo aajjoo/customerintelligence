@@ -41,6 +41,7 @@ export type OpportunityDTO = {
   stage: string;
   ownerLabel: string | null;
   rationale: string | null;
+  hubspotDealId: string | null;
   updatedAt: string;
 };
 
@@ -97,6 +98,8 @@ export type CustomerDTO = {
   report: ReportDTO;
   chatHistory: ChatMessageDTO[];
   monthly: { label: string; total: number; hot: number }[];
+  /** Etappe 7: welche Integrationen konfiguriert sind (steuert UI-Buttons) */
+  integrations: { hubspot: boolean };
   now: string;
 };
 

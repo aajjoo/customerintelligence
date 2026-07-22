@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useTransition } from "react";
 import ChartCanvas from "@/components/ChartCanvas";
 import type { CustomerDTO, KpiDTO } from "@/components/customer/types";
+import { importKpiValues } from "@/app/actions";
 import { fmtKpiValue, kpiDelta } from "@/lib/format";
 import { PROJECT_STATUS } from "@/lib/i18n";
 
@@ -60,11 +62,14 @@ export default function ProjectsTab({ customer }: { customer: CustomerDTO }) {
                 </div>
               )}
 
-              {p.externalRef && (
-                <div className="mt-5 text-[0.85rem] text-gray-700">
-                  Jira: <b className="font-medium text-ink">{p.externalRef}</b>
-                </div>
-              )}
+              <div className="mt-5 flex items-center gap-4 text-[0.85rem] text-gray-700">
+                {p.externalRef && (
+                  <span>
+                    Jira: <b className="font-medium text-ink">{p.externalRef}</b>
+                  </span>
+                )}
+                {p.kpis.length > 0 && <KpiImport projectId={p.id} />}
+              </div>
             </div>
           );
         })}
@@ -73,6 +78,70 @@ export default function ProjectsTab({ customer }: { customer: CustomerDTO }) {
         )}
       </div>
     </div>
+  );
+}
+
+/** Etappe 7: KPI-Werte per CSV importieren (kpi;periode;wert, Periode YYYY-MM). */
+function KpiImport({ projectId }: { projectId: string }) {
+  const [open, setOpen] = useState(false);
+  const [csv, setCsv] = useState("");
+  const [msg, setMsg] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function run() {
+    setMsg(null);
+    startTransition(async () => {
+      try {
+        const result = await importKpiValues(projectId, csv);
+        setMsg(
+          `${result.imported} Wert${result.imported === 1 ? "" : "e"} importiert` +
+            (result.errors.length > 0 ? ` · ${result.errors[0]}` : "")
+        );
+        if (result.errors.length === 0) setCsv("");
+      } catch (e) {
+        setMsg(e instanceof Error ? e.message : "Import fehlgeschlagen");
+      }
+    });
+  }
+
+  return (
+    <span className="relative">
+      <button
+        className="rounded border border-gray-150 px-2.5 py-1 text-[0.78rem] text-gray-700 hover:border-ink"
+        onClick={() => setOpen(!open)}
+      >
+        KPI-Import
+      </button>
+      {open && (
+        <div className="absolute left-0 top-8 z-10 w-[340px] rounded-card border border-gray-150 bg-paper p-4 shadow-lg">
+          <div className="mb-2 text-[0.78rem] text-gray-500">
+            Format: <code>kpi;periode;wert</code> – z. B. <code>Portal-Adoption;2026-08;51</code>
+          </div>
+          <textarea
+            className="h-24 w-full rounded-el border border-gray-150 p-2 font-mono text-[0.78rem] outline-none focus:border-ink"
+            value={csv}
+            onChange={(e) => setCsv(e.target.value)}
+            placeholder={"Portal-Adoption;2026-08;51\nTicket-Deflection;2026-08;34"}
+          />
+          {msg && <p className="mt-1 text-[0.75rem] text-gray-700">{msg}</p>}
+          <div className="mt-2 flex justify-end gap-2">
+            <button
+              className="rounded-el border border-gray-300 px-3 py-1.5 text-[0.8rem] font-medium"
+              onClick={() => setOpen(false)}
+            >
+              Schließen
+            </button>
+            <button
+              className="rounded-el bg-ink px-3 py-1.5 text-[0.8rem] font-medium text-paper disabled:opacity-50"
+              onClick={run}
+              disabled={pending || !csv.trim()}
+            >
+              {pending ? "Importiere …" : "Importieren"}
+            </button>
+          </div>
+        </div>
+      )}
+    </span>
   );
 }
 

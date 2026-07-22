@@ -165,6 +165,63 @@ export async function runPipelineForCustomer(customerId: string) {
   };
 }
 
+/** Etappe 7: qualifizierte Opportunity als Deal an HubSpot übergeben (Konzept 4.3). */
+export async function handOffToHubspot(opportunityId: string): Promise<{ dealId: string }> {
+  const opp = await db.opportunity.findUniqueOrThrow({
+    where: { id: opportunityId },
+    include: { customer: true },
+  });
+  await requireCustomerAccess(opp.customerId);
+  if (opp.hubspotDealId) return { dealId: opp.hubspotDealId };
+
+  const { createHubspotDeal } = await import("@/lib/integrations/hubspot");
+  const dealId = await createHubspotDeal({
+    title: opp.title,
+    customerName: opp.customer.name,
+    rationale: opp.rationale,
+  });
+  await db.opportunity.update({
+    where: { id: opportunityId },
+    data: { hubspotDealId: dealId },
+  });
+  revalidatePath("/", "layout");
+  return { dealId };
+}
+
+/** Etappe 7: KPI-Werte per CSV importieren (kpi;periode;wert, Periode YYYY-MM). */
+export async function importKpiValues(
+  projectId: string,
+  csv: string
+): Promise<{ imported: number; errors: string[] }> {
+  const project = await db.project.findUniqueOrThrow({
+    where: { id: projectId },
+    include: { kpis: true },
+  });
+  await requireCustomerAccess(project.customerId);
+
+  const { parseKpiCsv } = await import("@/lib/integrations/kpi-import");
+  const { rows, errors } = parseKpiCsv(csv);
+  let imported = 0;
+
+  for (const row of rows) {
+    const kpi = project.kpis.find(
+      (k) => k.label.toLowerCase() === row.kpiLabel.toLowerCase()
+    );
+    if (!kpi) {
+      errors.push(`KPI "${row.kpiLabel}" existiert nicht im Projekt ${project.name}`);
+      continue;
+    }
+    // ein Wert je KPI und Periode: bestehenden Wert ersetzen
+    await db.kpiValue.deleteMany({ where: { kpiId: kpi.id, period: row.period } });
+    await db.kpiValue.create({
+      data: { kpiId: kpi.id, period: row.period, value: row.value },
+    });
+    imported++;
+  }
+  revalidatePath("/", "layout");
+  return { imported, errors };
+}
+
 /** Prüft, ob der angemeldete Benutzer Account Lead des Kunden ist (bzw. Management/Admin). */
 async function requireLead(customerId: string) {
   const session = await getServerSession(authOptions);

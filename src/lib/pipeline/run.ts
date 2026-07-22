@@ -2,6 +2,7 @@
 // Review-Queue. Jeder Lauf wird als PipelineRun protokolliert.
 // Kernregel 1: jedes erzeugte Signal trägt eine Quellenangabe.
 import { db } from "@/lib/db";
+import { formatRunSummary, postToSlack, slackConfigured } from "@/lib/integrations/slack";
 import { generateReport } from "@/lib/report/generate";
 import { dedupe } from "./dedupe";
 import { checkKpi, kpiSignalHash } from "./kpi";
@@ -244,6 +245,16 @@ export async function runPipeline(options?: {
       where: { id: run.id },
       data: { status: "done", finishedAt: new Date(), statsJson: JSON.stringify(allStats) },
     });
+
+    // Etappe 7: Lauf-Zusammenfassung nach Slack (System-Notification, nur Cron)
+    if (options?.trigger === "cron" && slackConfigured()) {
+      try {
+        const summary = formatRunSummary(allStats);
+        if (summary) await postToSlack(summary);
+      } catch {
+        // Slack-Ausfall darf den Lauf nicht scheitern lassen
+      }
+    }
   } catch (e) {
     await db.pipelineRun.update({
       where: { id: run.id },

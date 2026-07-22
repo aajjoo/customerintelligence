@@ -97,10 +97,11 @@ model Opportunity {
   customerId  String
   signal      Signal?  @relation(fields: [signalId], references: [id])
   signalId    String?  @unique
-  title       String
-  rationale   String? // Bezug zum Netural-Leistungsportfolio
-  stage       String   @default("new") // new | reviewed | drafting | placed | won | dropped
-  ownerLabel  String?
+  title         String
+  rationale     String? // Bezug zum Netural-Leistungsportfolio
+  stage         String   @default("new") // new | reviewed | drafting | placed | won | dropped
+  ownerLabel    String?
+  hubspotDealId String? // gesetzt nach Übergabe an HubSpot (Etappe 7)
   tasks       Task[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
