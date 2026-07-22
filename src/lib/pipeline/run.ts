@@ -2,9 +2,11 @@
 // Review-Queue. Jeder Lauf wird als PipelineRun protokolliert.
 // Kernregel 1: jedes erzeugte Signal trägt eine Quellenangabe.
 import { db } from "@/lib/db";
+import { generateReport } from "@/lib/report/generate";
 import { dedupe } from "./dedupe";
 import { checkKpi, kpiSignalHash } from "./kpi";
 import { fetchFeed } from "./rss";
+import { checkTask } from "./taskcheck";
 import { crawlWebsite } from "./website";
 import { claudeScorer, type Scorer } from "./scoring";
 import type { CustomerProfile, CustomerRunStats, RawItem } from "./types";
@@ -29,6 +31,7 @@ export async function runPipeline(options?: {
     include: {
       sources: { where: { active: true } },
       projects: { include: { kpis: { include: { values: { orderBy: { period: "desc" }, take: 1 } } } } },
+      tasks: { where: { status: "open" }, include: { assignee: true } },
     },
   });
 
@@ -42,6 +45,7 @@ export async function runPipeline(options?: {
         created: 0,
         discarded: 0,
         kpiSignals: 0,
+        taskSignals: 0,
         errors: [],
       };
       allStats.push(stats);
@@ -184,6 +188,54 @@ export async function runPipeline(options?: {
             },
           });
           stats.kpiSignals++;
+        }
+      }
+
+      // ---- Etappe 5: Erinnerung/Eskalation überfälliger Aufgaben ----
+      const now = new Date();
+      for (const task of customer.tasks) {
+        const draft = checkTask(
+          {
+            taskId: task.id,
+            title: task.title,
+            status: task.status,
+            dueAt: task.dueAt,
+            assigneeName: task.assignee?.name ?? null,
+          },
+          now
+        );
+        if (!draft) continue;
+        const exists = await db.signal.findFirst({
+          where: { customerId: customer.id, contentHash: draft.contentHash },
+        });
+        if (exists) continue;
+        await db.signal.create({
+          data: {
+            customerId: customer.id,
+            dimension: "intern",
+            title: draft.title,
+            summary: draft.summary,
+            sourceLabel: draft.sourceLabel, // Quellenbezug: die Aufgabe selbst
+            relevance: draft.relevance,
+            contentHash: draft.contentHash,
+          },
+        });
+        stats.taskSignals++;
+      }
+
+      // ---- Etappe 5: Monatsbericht am Monatsersten automatisch erzeugen (Konzept 4.2) ----
+      if (options?.trigger === "cron" && now.getDate() === 1) {
+        const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const hasReport = await db.report.findUnique({
+          where: { customerId_month: { customerId: customer.id, month } },
+        });
+        if (!hasReport) {
+          try {
+            await generateReport(customer.id, month);
+            stats.reportGenerated = true;
+          } catch (e) {
+            stats.errors.push(`Bericht: ${e instanceof Error ? e.message : String(e)}`);
+          }
         }
       }
     }

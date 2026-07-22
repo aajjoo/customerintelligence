@@ -133,12 +133,23 @@ export default async function CustomerPage({ params }: { params: { slug: string 
       };
     }),
     report: customer.reports[0]
-      ? {
-          id: customer.reports[0].id,
-          month: customer.reports[0].month,
-          execSummary: customer.reports[0].execSummary,
-          status: customer.reports[0].status,
-        }
+      ? (() => {
+          const r = customer.reports[0];
+          let body: { sections?: { title: string; text: string }[]; suggestedTasks?: { title: string; dueInDays: number; reason: string }[] } = {};
+          try {
+            body = JSON.parse(r.bodyJson ?? "{}");
+          } catch {
+            // Alt-Berichte ohne validen Body → berechnete Abschnitte im Tab
+          }
+          return {
+            id: r.id,
+            month: r.month,
+            execSummary: r.execSummary,
+            status: r.status,
+            sections: body.sections ?? null,
+            suggestedTasks: body.suggestedTasks ?? null,
+          };
+        })()
       : null,
     monthly,
     now: now.toISOString(),

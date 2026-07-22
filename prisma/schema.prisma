@@ -160,10 +160,12 @@ model Report {
   customerId  String
   month       String // "2026-07"
   execSummary String
-  bodyJson    String? // Abschnitte als JSON
+  bodyJson    String? // Abschnitte + empfohlene Maßnahmen als JSON (siehe lib/report)
   status      String    @default("draft") // draft | approved
   approvedAt  DateTime?
   createdAt   DateTime  @default(now())
+
+  @@unique([customerId, month]) // ein Bericht je Kunde und Monat (Archiv über Monate)
 }
 
 model Skill {

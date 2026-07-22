@@ -69,6 +69,9 @@ export type ReportDTO = {
   month: string;
   execSummary: string;
   status: string;
+  /** Generierte Abschnitte (Etappe 5); null bei Alt-/Seed-Berichten ohne Body */
+  sections: { title: string; text: string }[] | null;
+  suggestedTasks: { title: string; dueInDays: number; reason: string }[] | null;
 } | null;
 
 export type CustomerDTO = {

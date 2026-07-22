@@ -35,5 +35,7 @@ export type CustomerRunStats = {
   created: number; // als Signal in der Review-Queue
   discarded: number; // bewertet, unter Relevanzschwelle aussortiert
   kpiSignals: number; // Kernregel 5
+  taskSignals: number; // Erinnerungen/Eskalationen überfälliger Aufgaben (Etappe 5)
+  reportGenerated?: boolean; // Monatsbericht am Monatsersten erzeugt
   errors: string[];
 };

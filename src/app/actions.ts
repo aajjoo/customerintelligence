@@ -165,13 +165,64 @@ export async function runPipelineForCustomer(customerId: string) {
   };
 }
 
-/** Monatsbericht freigeben (Account Lead). */
+/** Prüft, ob der angemeldete Benutzer Account Lead des Kunden ist (bzw. Management/Admin). */
+async function requireLead(customerId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Nicht angemeldet");
+  const { id, role } = session.user;
+  if (canSeeAllCustomers(role)) return;
+  const membership = await db.teamMembership.findFirst({
+    where: { userId: id, customerId, isLead: true },
+  });
+  if (!membership) {
+    throw new Error("Die Freigabe ist dem Account Lead vorbehalten (Konzept 4.2)");
+  }
+}
+
+/** Monatsbericht des Kunden generieren bzw. neu generieren (Etappe 5). */
+export async function generateMonthlyReport(customerId: string) {
+  await requireCustomerAccess(customerId);
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const { generateReport } = await import("@/lib/report/generate");
+  await generateReport(customerId, month);
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Monatsbericht freigeben – nur Account Lead (bzw. Management/Admin).
+ * Empfohlene Maßnahmen aus dem Bericht werden dabei als Aufgaben mit
+ * Fälligkeit angelegt (Konzept 4.2: Maßnahmen direkt in Aufgaben überführen).
+ */
 export async function approveReport(reportId: string) {
   const report = await db.report.findUniqueOrThrow({ where: { id: reportId } });
-  await requireCustomerAccess(report.customerId);
+  await requireLead(report.customerId);
+  if (report.status === "approved") return;
+
+  const { fmtReportMonth } = await import("@/lib/format");
+  const monthLabel = fmtReportMonth(report.month).split(" ")[0];
+  let suggested: { title: string; dueInDays: number }[] = [];
+  try {
+    suggested = JSON.parse(report.bodyJson ?? "{}").suggestedTasks ?? [];
+  } catch {
+    // Berichte ohne generierten Body (z. B. Seed) haben keine Maßnahmen
+  }
+
+  const now = new Date();
+  for (const t of suggested) {
+    await db.task.create({
+      data: {
+        customerId: report.customerId,
+        title: t.title,
+        originLabel: `aus Bericht ${monthLabel}`,
+        dueAt: new Date(now.getTime() + Math.max(1, t.dueInDays) * 86_400_000),
+      },
+    });
+  }
+
   await db.report.update({
     where: { id: reportId },
-    data: { status: "approved", approvedAt: new Date() },
+    data: { status: "approved", approvedAt: now },
   });
   revalidatePath("/", "layout");
 }

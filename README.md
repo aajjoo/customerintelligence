@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Etappen 1-4 abgeschlossen: UI-Kern, Login/Rechte, Pipeline v1 und Kunden-Onboarding.
+Etappen 1-5 abgeschlossen: UI-Kern, Login/Rechte, Pipeline v1, Kunden-Onboarding und Monatsbericht + Aufgaben.
+
+**Monatsbericht + Aufgaben (Etappe 5):** Claude generiert je Kunde einen Monatsbericht (Executive Summary, wichtigste Signale je Dimension mit Quellen, Projekte & KPIs, Opportunities & Aufgaben, Entwicklung ggü. Vormonat) plus empfohlene Maßnahmen – automatisch am Monatsersten im Cron oder manuell im Bericht-Tab. Freigabe nur durch den Account Lead (bzw. Management/Admin); dabei werden die Maßnahmen als Aufgaben mit Fälligkeit angelegt ("aus Bericht X"). Freigegebene Berichte sind archiviert (ein Bericht je Kunde+Monat) und als PDF exportierbar (/api/berichte/[id]/pdf, pdf-lib). Überfällige Aufgaben erzeugen im täglichen Lauf einmalig ein Erinnerungs-Signal (ab 1 Tag) bzw. Eskalations-Signal (ab 3 Tagen) im Internen Lagebild.
 
 **Pipeline v1 (Etappe 3):** Quellen-Konnektoren (RSS 2.0 / RSS 1.0-RDF / Atom, Website-Crawler mit Änderungserkennung), Dedupe über Titel-Hash, Claude-Scoring gegen Kundenprofil + Netural-Leistungsportfolio mit deutscher Zusammenfassung (strukturierte Outputs, gebatcht), Review-Queue im Radar-Tab ("Zu prüfen"-Filter, "Quellen abrufen"-Button). Aussortierte Items werden als review=irrelevant gespeichert (kein Re-Scoring). Kernregel 5: KPI unter Schwelle erzeugt automatisch ein "Internes Lagebild"-Signal (dedupliziert je KPI+Monat). Jeder Lauf protokolliert als PipelineRun. Täglicher Cron 6:00 über vercel.json → /api/pipeline/run (CRON_SECRET). Benötigt ANTHROPIC_API_KEY; optional CLAUDE_MODEL.
 
@@ -53,4 +55,4 @@ Login & Rechte (nachgezogen aus Etappe 1):
 
 Hinweis: Beim ursprünglichen GitHub-Upload fehlten einige Etappe-1-Dateien (`globals.css`, `Sidebar`, `Topbar`, `lib/db.ts`, `.gitignore`); sie wurden in Etappe 2 rekonstruiert.
 
-Nächster Schritt laut `CLAUDE.md`: Etappe 5, Monatsbericht + Aufgaben (Berichtgenerierung, Freigabe, PDF-Export, Erinnerung, Eskalation).
+Nächster Schritt laut `CLAUDE.md`: Etappe 6, Chat (RAG über Signale/Berichte/Projekte mit pgvector, Quellen-Chips, Fragevorschläge).
