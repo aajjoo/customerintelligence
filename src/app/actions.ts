@@ -336,21 +336,8 @@ export async function createProject(
   revalidatePath("/", "layout");
 }
 
-/** Pipeline manuell für einen Kunden anstoßen (Quellen abrufen, bewerten, Review-Queue). */
-export async function runPipelineForCustomer(customerId: string) {
-  await requireCustomerAccess(customerId);
-  const { runPipeline } = await import("@/lib/pipeline/run");
-  const result = await runPipeline({ customerId, trigger: "manual" });
-  revalidatePath("/", "layout");
-  const stats = result.stats[0];
-  return {
-    created: stats?.created ?? 0,
-    discarded: stats?.discarded ?? 0,
-    kpiSignals: stats?.kpiSignals ?? 0,
-    fetched: stats?.fetched ?? 0,
-    errors: stats?.errors ?? [],
-  };
-}
+// Der manuelle Pipeline-Lauf läuft als API-Route /api/pipeline/kunde
+// (maxDuration 300) – als Server-Action brach er am Function-Timeout ab.
 
 /** Etappe 7: qualifizierte Opportunity als Deal an HubSpot übergeben (Konzept 4.3). */
 export async function handOffToHubspot(opportunityId: string): Promise<{ dealId: string }> {

@@ -37,5 +37,6 @@ export type CustomerRunStats = {
   kpiSignals: number; // Kernregel 5
   taskSignals: number; // Erinnerungen/Eskalationen überfälliger Aufgaben (Etappe 5)
   reportGenerated?: boolean; // Monatsbericht am Monatsersten erzeugt
+  notes: string[]; // Hinweise ohne Fehlercharakter (z. B. "Quelle unverändert")
   errors: string[];
 };

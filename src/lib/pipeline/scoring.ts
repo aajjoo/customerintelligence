@@ -5,7 +5,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { CustomerProfile, RawItem, ScoredItem } from "./types";
 
-const MODEL = process.env.CLAUDE_MODEL ?? "claude-opus-4-8";
+// SCORING_MODEL erlaubt ein schnelleres Modell nur fürs Signal-Scoring
+// (z. B. claude-haiku-4-5), ohne Bericht/Chat/Workflows umzustellen.
+const MODEL =
+  process.env.SCORING_MODEL ?? process.env.CLAUDE_MODEL ?? "claude-opus-4-8";
 const BATCH_SIZE = 10;
 
 /** Zentral gepflegtes Netural-Leistungsportfolio (Referenz laut Konzept Kap. 3.2). */
@@ -130,7 +133,9 @@ export function createClaudeScorer(extras?: ScoringExtras): Scorer {
         },
       ],
       output_config: {
-        effort: "medium",
+        // Klassifikation + Kurzzusammenfassung ist mechanisch: low ist deutlich
+        // schneller bei praktisch gleicher Qualität (Performance-Feedback)
+        effort: "low",
         format: { type: "json_schema", schema: SCORING_SCHEMA },
       },
       messages: [

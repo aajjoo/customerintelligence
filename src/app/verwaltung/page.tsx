@@ -70,6 +70,7 @@ export default async function VerwaltungPage() {
               url: s.url,
               active: s.active,
               lastFetchedAt: s.lastFetchedAt?.toISOString() ?? null,
+              lastError: s.lastError,
             })),
           }))}
           users={users.map((u) => ({

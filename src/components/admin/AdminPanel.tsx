@@ -6,12 +6,12 @@ import {
   addSource,
   deleteCustomer,
   deleteSource,
-  runPipelineForCustomer,
   saveAreaSkill,
   setResearchFrequency,
   setUserRole,
   toggleSource,
 } from "@/app/actions";
+import { formatPipelineResult } from "@/components/customer/RadarTab";
 
 // Verwaltung (Client): Kundenliste mit Frequenz/Recherche/Löschen, Quellen je Kunde,
 // Benutzerrollen (Admin), Leistungsportfolio-Editor (wirkt auf die AI-Analyse).
@@ -23,6 +23,7 @@ type SourceRow = {
   url: string | null;
   active: boolean;
   lastFetchedAt: string | null;
+  lastError: string | null;
 };
 
 type CustomerRow = {
@@ -78,14 +79,17 @@ export default function AdminPanel({
   };
 
   async function research(customerId: string, name: string) {
-    setMsg(null);
+    setMsg(`${name}: Quellen werden abgerufen und bewertet – das kann 1-2 Minuten dauern …`);
     setRunning(customerId);
     try {
-      const result = await runPipelineForCustomer(customerId);
-      setMsg(
-        `${name}: ${result.fetched} Items geholt, ${result.created + result.kpiSignals} neue Signale` +
-          (result.errors.length > 0 ? ` · ${result.errors[0]}` : "")
-      );
+      const res = await fetch("/api/pipeline/kunde", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ customerId }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Recherche fehlgeschlagen");
+      setMsg(`${name}: ${formatPipelineResult(result)}`);
       router.refresh();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "Recherche fehlgeschlagen");
@@ -186,6 +190,11 @@ export default function AdminPanel({
                           ? ` · zuletzt ${s.lastFetchedAt.slice(0, 10)}`
                           : " · noch nie abgerufen"}
                       </span>
+                      {s.lastError && (
+                        <span className="w-full text-[0.74rem] font-medium text-neg">
+                          Letzter Abruf fehlgeschlagen: {s.lastError}
+                        </span>
+                      )}
                       <span className="ml-auto flex gap-2">
                         <button
                           className="rounded border border-gray-150 px-2 py-0.5 text-[0.74rem] hover:border-ink"

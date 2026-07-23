@@ -3,12 +3,8 @@
 import { useMemo, useState, useTransition } from "react";
 import ChartCanvas from "@/components/ChartCanvas";
 import type { CustomerDTO, SignalDTO, TabKey } from "@/components/customer/types";
-import {
-  reviewSignal,
-  runPipelineForCustomer,
-  signalToOpportunity,
-  signalToTask,
-} from "@/app/actions";
+import { useRouter } from "next/navigation";
+import { reviewSignal, signalToOpportunity, signalToTask } from "@/app/actions";
 import { fmtDay, fmtRelativeDay } from "@/lib/format";
 import { DIMENSIONS, dimensionLabel } from "@/lib/i18n";
 
@@ -28,7 +24,8 @@ export default function RadarTab({
   const [reviewed, setReviewed] = useState<Record<string, string>>({});
   const [, startTransition] = useTransition();
   const [pipelineMsg, setPipelineMsg] = useState<string | null>(null);
-  const [pipelineRunning, startPipeline] = useTransition();
+  const [pipelineRunning, setPipelineRunning] = useState(false);
+  const router = useRouter();
 
   const now = new Date(customer.now);
   const signals = useMemo(
@@ -69,23 +66,24 @@ export default function RadarTab({
     startTransition(() => signalToTask(id));
   }
 
-  function triggerPipeline() {
-    setPipelineMsg(null);
-    startPipeline(async () => {
-      try {
-        const result = await runPipelineForCustomer(customer.id);
-        const parts = [
-          `${result.fetched} Items geholt`,
-          `${result.created + result.kpiSignals} neue Signale`,
-        ];
-        if (result.discarded > 0) parts.push(`${result.discarded} als irrelevant aussortiert`);
-        setPipelineMsg(
-          result.errors.length > 0 ? `Fehler: ${result.errors[0]}` : parts.join(", ")
-        );
-      } catch (e) {
-        setPipelineMsg(e instanceof Error ? e.message : "Pipeline-Lauf fehlgeschlagen");
-      }
-    });
+  async function triggerPipeline() {
+    setPipelineMsg("Quellen werden abgerufen und bewertet – das kann 1-2 Minuten dauern …");
+    setPipelineRunning(true);
+    try {
+      const res = await fetch("/api/pipeline/kunde", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ customerId: customer.id }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error ?? "Pipeline fehlgeschlagen");
+      setPipelineMsg(formatPipelineResult(result));
+      router.refresh();
+    } catch (e) {
+      setPipelineMsg(e instanceof Error ? e.message : "Pipeline-Lauf fehlgeschlagen");
+    } finally {
+      setPipelineRunning(false);
+    }
   }
 
   return (
@@ -241,6 +239,36 @@ export default function RadarTab({
       </div>
     </div>
   );
+}
+
+/** Lauf-Ergebnis verständlich zusammenfassen (statt "0 Items, 0 Signale"). */
+export function formatPipelineResult(r: {
+  fetched: number;
+  created: number;
+  discarded: number;
+  kpiSignals: number;
+  errors: string[];
+  notes?: string[];
+}): string {
+  if (r.errors.length > 0) {
+    return `Fehler bei ${r.errors.length} Quelle${r.errors.length > 1 ? "n" : ""}: ${r.errors[0]}${
+      r.errors.length > 1 ? " …" : ""
+    } (Details in der Verwaltung)`;
+  }
+  const neu = r.created + r.kpiSignals;
+  if (neu > 0) {
+    return `${neu} neue Signale aus ${r.fetched} Items${
+      r.discarded > 0 ? `, ${r.discarded} als irrelevant aussortiert` : ""
+    }`;
+  }
+  if (r.fetched === 0) {
+    return r.notes && r.notes.length > 0
+      ? `Keine neuen Inhalte: ${r.notes[0]}`
+      : "Keine neuen Inhalte an den Quellen (alles bereits bekannt)";
+  }
+  return `${r.fetched} Items geprüft – nichts Relevantes${
+    r.discarded > 0 ? ` (${r.discarded} aussortiert)` : ""
+  }`;
 }
 
 function Chip({

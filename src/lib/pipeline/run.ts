@@ -54,6 +54,7 @@ export async function runPipeline(options?: {
         discarded: 0,
         kpiSignals: 0,
         taskSignals: 0,
+        notes: [],
         errors: [],
       };
       allStats.push(stats);
@@ -88,7 +89,7 @@ export async function runPipeline(options?: {
             const items = await fetchFeed(source.url);
             stats.fetched += items.length;
             if (items.length > MAX_ITEMS_PER_SOURCE) {
-              stats.errors.push(
+              stats.notes.push(
                 `${source.label}: ${items.length - MAX_ITEMS_PER_SOURCE} Items über Limit verworfen`
               );
             }
@@ -107,16 +108,24 @@ export async function runPipeline(options?: {
                 where: { id: source.id },
                 data: { stateJson: JSON.stringify({ contentHash: result.contentHash }) },
               });
+            } else {
+              stats.notes.push(`${source.label}: unverändert seit letztem Abruf`);
             }
           } else {
-            continue; // andere Quellenarten folgen in Etappe 7
+            continue; // andere Quellenarten folgen mit den Integrationen
           }
+          // Erfolg: Zeitstempel setzen, letzten Fehler löschen (Diagnose in der Verwaltung)
           await db.source.update({
             where: { id: source.id },
-            data: { lastFetchedAt: new Date() },
+            data: { lastFetchedAt: new Date(), lastError: null },
           });
         } catch (e) {
-          stats.errors.push(`${source.label}: ${e instanceof Error ? e.message : String(e)}`);
+          const message = e instanceof Error ? e.message : String(e);
+          stats.errors.push(`${source.label}: ${message}`);
+          await db.source.update({
+            where: { id: source.id },
+            data: { lastFetchedAt: new Date(), lastError: message.slice(0, 300) },
+          });
         }
       }
 

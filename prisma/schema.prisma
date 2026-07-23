@@ -65,6 +65,7 @@ model Source {
   url           String?
   active        Boolean   @default(true)
   lastFetchedAt DateTime? // letzter Pipeline-Abruf
+  lastError     String? // Fehler des letzten Abrufs (null = erfolgreich) – Diagnose in der Verwaltung
   stateJson     String? // Crawler-Zustand (z. B. Content-Hash der Seite) für Änderungserkennung
   signals       Signal[]
 }

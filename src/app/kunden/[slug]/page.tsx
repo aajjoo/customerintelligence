@@ -21,22 +21,20 @@ export default async function CustomerPage({ params }: { params: { slug: string 
   const session = await getServerSession(authOptions);
   const user = session!.user;
   const accessWhere = customerWhereForUser(user.id, user.role);
-  const chatHistory = await db.chatMessage.findMany({
-    where: { customer: { slug: params.slug }, userId: user.id },
-    orderBy: { createdAt: "asc" },
-    take: 40,
-  });
-  const globalNew = await db.signal.count({
-    where: { isNew: true, customer: accessWhere },
-  });
-  const skills = await db.skill.findMany({
-    where: { active: true, scope: "org" },
-    orderBy: { name: "asc" },
-  });
-  const customer = await db.customer.findFirst({
+  // Alle Queries parallel (Performance: Neon-Roundtrips nicht serialisieren)
+  const [chatHistory, globalNew, skills, customer] = await Promise.all([
+    db.chatMessage.findMany({
+      where: { customer: { slug: params.slug }, userId: user.id },
+      orderBy: { createdAt: "asc" },
+      take: 40,
+    }),
+    db.signal.count({ where: { isNew: true, customer: accessWhere } }),
+    db.skill.findMany({ where: { active: true, scope: "org" }, orderBy: { name: "asc" } }),
+    db.customer.findFirst({
     where: { slug: params.slug, ...accessWhere },
     include: {
-      signals: { orderBy: [{ occurredAt: "desc" }] },
+      // aussortierte Signale (review=irrelevant) zeigt die UI nie – nicht laden
+      signals: { where: { review: { not: "irrelevant" } }, orderBy: [{ occurredAt: "desc" }] },
       projects: {
         orderBy: { createdAt: "asc" },
         include: { kpis: { include: { values: { orderBy: { period: "asc" } } } } },
@@ -49,7 +47,8 @@ export default async function CustomerPage({ params }: { params: { slug: string 
       reports: { orderBy: { month: "desc" }, take: 1 },
       memberships: { where: { isLead: true }, include: { user: true } },
     },
-  });
+    }),
+  ]);
   if (!customer) notFound();
 
   const monthFmt = new Intl.DateTimeFormat("de-AT", { month: "short" });
