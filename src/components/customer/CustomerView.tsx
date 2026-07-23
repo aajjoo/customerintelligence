@@ -13,8 +13,14 @@ import { fmtReportMonth } from "@/lib/format";
 // Kundenseite: Header + 5 Tabs laut design-spec.md.
 // Tab-Zustand lebt im Client; alle Daten kommen serialisiert vom Server.
 
-export default function CustomerView({ customer }: { customer: CustomerDTO }) {
-  const [tab, setTab] = useState<TabKey>("radar");
+export default function CustomerView({
+  customer,
+  initialTab = "radar",
+}: {
+  customer: CustomerDTO;
+  initialTab?: TabKey;
+}) {
+  const [tab, setTab] = useState<TabKey>(initialTab);
 
   const newCount = customer.signals.filter((s) => s.isNew).length;
   const openTasks = customer.tasks.filter((t) => t.status === "open").length;

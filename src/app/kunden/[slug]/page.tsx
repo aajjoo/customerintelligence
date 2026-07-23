@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import CustomerView from "@/components/customer/CustomerView";
-import type { CustomerDTO, WorkflowStepDTO } from "@/components/customer/types";
+import type { CustomerDTO, TabKey, WorkflowStepDTO } from "@/components/customer/types";
 import { customerWhereForUser } from "@/lib/access";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -16,7 +16,13 @@ export const dynamic = "force-dynamic";
 // serialisierbares DTO an die Client-Ansicht mit den 5 Tabs (siehe design-spec.md).
 // Zugriff nur für zugeordnete Teams bzw. Management/Admin (Kernregel 3).
 
-export default async function CustomerPage({ params }: { params: { slug: string } }) {
+export default async function CustomerPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: { tab?: string };
+}) {
   const now = new Date();
   const session = await getServerSession(authOptions);
   const user = session!.user;
@@ -186,7 +192,14 @@ export default async function CustomerPage({ params }: { params: { slug: string 
       />
       <main className="w-full max-w-[1240px] px-5 pb-28 md:px-12 md:pb-20">
         <Topbar hasNew={globalNew > 0} />
-        <CustomerView customer={dto} />
+        <CustomerView
+          customer={dto}
+          initialTab={
+            ["radar", "projekte", "chat", "aufgaben", "bericht"].includes(searchParams.tab ?? "")
+              ? (searchParams.tab as TabKey)
+              : "radar"
+          }
+        />
       </main>
     </div>
   );
