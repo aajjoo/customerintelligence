@@ -272,6 +272,41 @@ export async function saveAreaSkill(areaKey: string, instruction: string) {
   revalidatePath("/", "layout");
 }
 
+/** Recherche-Skill anlegen/bearbeiten (Skills-Seite) – steuert die automatische Websuche. */
+export async function saveResearchSkill(input: {
+  id?: string;
+  name: string;
+  promptTmpl: string;
+  active: boolean;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !["lead", "management", "admin"].includes(session.user.role)) {
+    throw new Error("Skills bearbeiten dürfen Account Leads, Management und Admin");
+  }
+  if (!input.name.trim()) throw new Error("Name erforderlich");
+  const data = {
+    name: input.name.trim(),
+    promptTmpl: input.promptTmpl.trim() || null,
+    active: input.active,
+    scope: "research",
+  };
+  if (input.id) await db.skill.update({ where: { id: input.id }, data });
+  else await db.skill.create({ data });
+  revalidatePath("/", "layout");
+}
+
+/** Recherche-Skill löschen. */
+export async function deleteResearchSkill(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !["lead", "management", "admin"].includes(session.user.role)) {
+    throw new Error("Skills bearbeiten dürfen Account Leads, Management und Admin");
+  }
+  const skill = await db.skill.findUniqueOrThrow({ where: { id } });
+  if (skill.scope !== "research") throw new Error("Kein Recherche-Skill");
+  await db.skill.delete({ where: { id } });
+  revalidatePath("/", "layout");
+}
+
 /** Workflow-Skill anlegen/bearbeiten (Skills-Seite). */
 export async function saveWorkflowSkill(input: {
   id?: string;

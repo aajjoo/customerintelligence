@@ -2,11 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { saveAreaSkill, saveWorkflowSkill } from "@/app/actions";
+import {
+  deleteResearchSkill,
+  saveAreaSkill,
+  saveResearchSkill,
+  saveWorkflowSkill,
+} from "@/app/actions";
 
-// Skills (Client): Bereichs-Anweisungen (wirken auf die AI-Analyse) + Workflow-Skills.
+// Skills (Client): Recherche-Skills (automatische Websuche), Bereichs-Anweisungen
+// (wirken auf die AI-Analyse) und Workflow-Skills.
 
 type Area = { key: string; label: string; hint: string; instruction: string };
+type ResearchSkill = { id: string; name: string; promptTmpl: string; active: boolean };
 type WorkflowSkill = {
   id: string;
   name: string;
@@ -27,9 +34,11 @@ const EMPTY: WorkflowSkill = {
 
 export default function SkillsPanel({
   areas,
+  researchSkills,
   workflowSkills,
 }: {
   areas: Area[];
+  researchSkills: ResearchSkill[];
   workflowSkills: WorkflowSkill[];
 }) {
   const router = useRouter();
@@ -39,6 +48,7 @@ export default function SkillsPanel({
     Object.fromEntries(areas.map((a) => [a.key, a.instruction]))
   );
   const [editing, setEditing] = useState<WorkflowSkill | null>(null);
+  const [editingResearch, setEditingResearch] = useState<ResearchSkill | null>(null);
 
   const act = (fn: () => Promise<unknown>, success: string) => {
     setMsg(null);
@@ -47,6 +57,7 @@ export default function SkillsPanel({
         await fn();
         setMsg(success);
         setEditing(null);
+        setEditingResearch(null);
         router.refresh();
       } catch (e) {
         setMsg(e instanceof Error ? e.message : "Speichern fehlgeschlagen");
@@ -57,6 +68,119 @@ export default function SkillsPanel({
   return (
     <div className="mt-8 flex flex-col gap-10">
       {msg && <p className="text-[0.85rem] text-gray-700">{msg}</p>}
+
+      {/* ---- Recherche-Skills: automatische Quellensuche ---- */}
+      <section>
+        <div className="mb-1 flex items-center justify-between">
+          <h2 className="text-[1.2rem]">Recherche-Skills</h2>
+          <button
+            className="rounded-el border border-gray-300 px-3 py-1.5 text-[0.85rem] font-medium hover:border-ink"
+            onClick={() => setEditingResearch({ id: "", name: "", promptTmpl: "", active: true })}
+          >
+            + Recherche-Skill
+          </button>
+        </div>
+        <p className="mb-4 max-w-[640px] text-[0.85rem] text-gray-500">
+          Steuern die automatische Websuche je Kunde: für jeden aktiven Skill recherchiert Claude
+          bei jedem Lauf aktiv im Netz (Kundenprofil + Anweisung) – ohne manuell gepflegte Feeds.
+        </p>
+        <div className="flex flex-col gap-3">
+          {researchSkills.map((s) => (
+            <div key={s.id} className="rounded-card border border-gray-150 p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`font-medium ${s.active ? "" : "text-gray-500 line-through"}`}>
+                  {s.name}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[0.82rem] text-gray-500">
+                  {s.promptTmpl}
+                </span>
+                <button
+                  className="rounded-el border border-gray-300 px-3 py-1 text-[0.8rem] font-medium hover:border-ink"
+                  onClick={() => setEditingResearch({ ...s })}
+                >
+                  Bearbeiten
+                </button>
+                <button
+                  className="rounded-el border border-gray-300 px-3 py-1 text-[0.8rem] font-medium text-neg hover:border-neg"
+                  onClick={() => act(() => deleteResearchSkill(s.id), `${s.name} gelöscht`)}
+                >
+                  Löschen
+                </button>
+              </div>
+            </div>
+          ))}
+          {researchSkills.length === 0 && (
+            <p className="text-[0.85rem] text-gray-500">
+              Keine Recherche-Skills – die automatische Websuche ist damit inaktiv.
+            </p>
+          )}
+        </div>
+
+        {editingResearch && (
+          <div className="mt-5 rounded-card border border-gray-150 border-l-[3px] border-l-accent p-6">
+            <h3 className="mb-4 text-[1.05rem]">
+              {editingResearch.id
+                ? `Recherche-Skill bearbeiten: ${editingResearch.name}`
+                : "Neuer Recherche-Skill"}
+            </h3>
+            <div className="grid gap-3">
+              <input
+                className="rounded-el border border-gray-300 px-3 py-2 text-[0.9rem] outline-none focus:border-ink"
+                placeholder="Name (z. B. Mitbewerber, Fachmedien, Plattformen)"
+                value={editingResearch.name}
+                onChange={(e) => setEditingResearch({ ...editingResearch, name: e.target.value })}
+              />
+              <textarea
+                className="h-28 rounded-el border border-gray-300 p-3 text-[0.9rem] leading-relaxed outline-none focus:border-ink"
+                placeholder="Recherche-Anweisung: wonach soll gesucht werden? (Kundenprofil wird automatisch mitgegeben)"
+                value={editingResearch.promptTmpl}
+                onChange={(e) =>
+                  setEditingResearch({ ...editingResearch, promptTmpl: e.target.value })
+                }
+              />
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 text-[0.85rem] text-gray-700">
+                  <input
+                    type="checkbox"
+                    className="accent-ink"
+                    checked={editingResearch.active}
+                    onChange={(e) =>
+                      setEditingResearch({ ...editingResearch, active: e.target.checked })
+                    }
+                  />
+                  aktiv
+                </label>
+                <span className="ml-auto flex gap-2">
+                  <button
+                    className="rounded-el border border-gray-300 px-4 py-2 text-[0.85rem] font-medium"
+                    onClick={() => setEditingResearch(null)}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    className="rounded-el bg-ink px-4 py-2 text-[0.85rem] font-medium text-paper disabled:opacity-50"
+                    disabled={pending || !editingResearch.name.trim()}
+                    onClick={() =>
+                      act(
+                        () =>
+                          saveResearchSkill({
+                            id: editingResearch.id || undefined,
+                            name: editingResearch.name,
+                            promptTmpl: editingResearch.promptTmpl,
+                            active: editingResearch.active,
+                          }),
+                        "Recherche-Skill gespeichert"
+                      )
+                    }
+                  >
+                    Speichern
+                  </button>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* ---- Analyse-Anweisungen je Bereich ---- */}
       <section>

@@ -10,6 +10,8 @@ import { fetchFeed } from "./rss";
 import { checkTask } from "./taskcheck";
 import { crawlWebsite } from "./website";
 import { createClaudeScorer, type Scorer } from "./scoring";
+import { runWebResearch } from "./webresearch";
+import { contentHash } from "./dedupe";
 import { getAreaInstruction } from "@/lib/areaSkills";
 import type { CustomerProfile, CustomerRunStats, RawItem } from "./types";
 
@@ -24,12 +26,18 @@ export async function runPipeline(options?: {
   scorer?: Scorer; // injizierbar für Tests
 }): Promise<{ runId: string; stats: CustomerRunStats[] }> {
   // Team-Vorgaben aus den Bereichs-Skills (wirken auf die AI-Analyse)
+  const portfolio = await getAreaInstruction("leistungsportfolio");
   const scorer =
     options?.scorer ??
     createClaudeScorer({
-      portfolio: await getAreaInstruction("leistungsportfolio"),
+      portfolio,
       instruction: await getAreaInstruction("scoring"),
     });
+  // Globale Recherche-Skills: steuern die automatische Websuche je Kunde
+  const researchSkills = await db.skill.findMany({
+    where: { scope: "research", active: true },
+    orderBy: { name: "asc" },
+  });
   const run = await db.pipelineRun.create({
     data: { trigger: options?.trigger ?? "manual" },
   });
@@ -176,6 +184,56 @@ export async function runPipeline(options?: {
           }
         } catch (e) {
           stats.errors.push(`Scoring: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+
+      // ---- Automatische Web-Recherche über globale Recherche-Skills ----
+      // Claude sucht aktiv im Web (web_search) je aktivem Recherche-Skill;
+      // Ergebnisse sind bereits bewertet und tragen URL-Quellen (Kernregel 1).
+      if (researchDue && researchSkills.length > 0 && !options?.scorer) {
+        try {
+          const research = await runWebResearch(
+            profile,
+            researchSkills.map((s) => ({ name: s.name, promptTmpl: s.promptTmpl })),
+            { days: customer.researchFrequency === "weekly" ? 10 : 7, portfolio }
+          );
+          stats.errors.push(...research.errors);
+          stats.fetched += research.items.length;
+
+          const knownForResearch = new Set(
+            (
+              await db.signal.findMany({
+                where: { customerId: customer.id, contentHash: { not: null } },
+                select: { contentHash: true },
+              })
+            ).map((s) => s.contentHash as string)
+          );
+          for (const item of research.items) {
+            const hash = contentHash({ title: item.titleDe });
+            if (knownForResearch.has(hash)) continue;
+            knownForResearch.add(hash);
+            stats.fresh++;
+            const belowThreshold = item.relevance < MIN_RELEVANCE;
+            await db.signal.create({
+              data: {
+                customerId: customer.id,
+                dimension: item.dimension,
+                title: item.titleDe,
+                summary: item.summaryDe,
+                sourceLabel: `${item.sourceName} · Recherche: ${item.skillName}`,
+                sourceUrl: item.url,
+                relevance: item.relevance,
+                contentHash: hash,
+                ...(belowThreshold ? { review: "irrelevant", isNew: false } : {}),
+              },
+            });
+            if (belowThreshold) stats.discarded++;
+            else stats.created++;
+          }
+        } catch (e) {
+          stats.errors.push(
+            `Web-Recherche: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
       }
 

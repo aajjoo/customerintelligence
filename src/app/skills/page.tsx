@@ -17,9 +17,10 @@ export default async function SkillsPage() {
   const session = await getServerSession(authOptions);
   const user = session!.user;
 
-  const [areaSkills, workflowSkills, totalNew] = await Promise.all([
+  const [areaSkills, workflowSkills, researchSkills, totalNew] = await Promise.all([
     db.skill.findMany({ where: { scope: "area" } }),
     db.skill.findMany({ where: { scope: "org" }, orderBy: { name: "asc" } }),
+    db.skill.findMany({ where: { scope: "research" }, orderBy: { name: "asc" } }),
     db.signal.count({ where: { isNew: true, customer: customerWhereForUser(user.id, user.role) } }),
   ]);
 
@@ -49,6 +50,12 @@ export default async function SkillsPage() {
 
         <SkillsPanel
           areas={areas}
+          researchSkills={researchSkills.map((s) => ({
+            id: s.id,
+            name: s.name,
+            promptTmpl: s.promptTmpl ?? "",
+            active: s.active,
+          }))}
           workflowSkills={workflowSkills.map((s) => ({
             id: s.id,
             name: s.name,

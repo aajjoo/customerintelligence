@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Alle 8 Etappen abgeschlossen, plus Feedback-Runde 1 (23.07.2026):
+Alle 8 Etappen abgeschlossen, plus Feedback-Runden 1-2 (23.07.2026):
+
+**Automatische Web-Recherche über Recherche-Skills (23.07.2026):** Quellen müssen nicht mehr manuell als Feeds gepflegt werden. Unter /skills gibt es globale Recherche-Skills (z. B. Mitbewerber, Fachmedien & Branchennews, Plattformen & Portale, Unternehmensmeldungen, Stellenausschreibungen) – für jeden aktiven Skill recherchiert Claude bei jedem Pipeline-Lauf mit dem serverseitigen Web-Search-Tool aktiv im Netz, gesteuert durch die Skill-Anweisung plus Kundenprofil (Branche, Märkte, Mitbewerber, Themen) und das Netural-Leistungsportfolio. Jede gefundene Meldung trägt URL und Quellenname (Kernregel 1) und landet als Signal in der Review-Queue (Quellenlabel „… · Recherche: <Skill>"); Dedupe über den Titel-Hash wie bei Feeds. Manuell hinterlegte Quellen (RSS/Website) funktionieren weiterhin zusätzlich, sind aber optional. Fünf Standard-Skills sind vorangelegt und unter /skills editierbar.
 
 **Performance & Crawling-Fixes (23.07.2026):** Vercel-Functions laufen jetzt in Frankfurt (fra1, nahe der Neon-DB – vorher US-Ost mit ~100 ms Latenz je Query, Hauptursache der schlechten Performance). Der manuelle Pipeline-Lauf läuft als API-Route /api/pipeline/kunde mit maxDuration 300 (als Server-Action brach er in Produktion am Timeout ab – deshalb "keine Ergebnisse"). Signal-Scoring mit effort low (schneller); optional SCORING_MODEL für ein schnelleres Modell nur im Scoring. Quellen speichern den letzten Abruf-Fehler (Anzeige in der Verwaltung); Lauf-Meldungen unterscheiden jetzt "Quelle unverändert", "nichts Relevantes" und echte Fehler. Kundenseite lädt Queries parallel und ohne aussortierte Signale.
 

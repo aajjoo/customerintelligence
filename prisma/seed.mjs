@@ -192,6 +192,17 @@ async function main() {
     ],
   });
 
+  // Recherche-Skills: steuern die automatische Websuche der Pipeline (statt manueller Feeds)
+  await db.skill.createMany({
+    data: [
+      { name: "Mitbewerber", scope: "research", promptTmpl: "Recherchiere aktuelle Aktivitäten der Mitbewerber des Kunden: Produkt-Launches, digitale Initiativen (Portale, Apps, KI), Partnerschaften, Übernahmen, Preis- oder Strategieänderungen." },
+      { name: "Fachmedien & Branchennews", scope: "research", promptTmpl: "Durchsuche Fachmedien und Branchenportale nach Neuigkeiten zum Kunden und seiner Branche: Marktentwicklungen, Studien, Trends, Interviews und Berichte mit direktem Bezug zu den strategischen Themen des Kunden." },
+      { name: "Plattformen & Portale", scope: "research", promptTmpl: "Suche nach Entwicklungen rund um digitale Plattformen, Kundenportale, E-Commerce und Self-Service in der Branche des Kunden: neue Angebote, Relaunches, Technologieentscheidungen – auch bei branchennahen Vorreitern." },
+      { name: "Unternehmensmeldungen", scope: "research", promptTmpl: "Recherchiere offizielle Meldungen des Kunden selbst: Pressemitteilungen, Investitionen, Führungswechsel, Standorte, Quartalszahlen, Auszeichnungen und größere Projekte." },
+      { name: "Stellenausschreibungen & Organisation", scope: "research", promptTmpl: "Suche nach Stellenausschreibungen und Organisationssignalen des Kunden mit Digitalbezug (IT, Digital, E-Commerce, Daten/KI, Marketing-Technologie) – sie zeigen, wo intern investiert wird." },
+    ],
+  });
+
   console.log("Seed abgeschlossen:", await db.customer.count(), "Kunden,", await db.signal.count(), "Signale.");
 }
 
