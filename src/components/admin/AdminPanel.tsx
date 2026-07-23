@@ -4,17 +4,21 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   addSource,
+  addTeamMember,
   deleteCustomer,
   deleteSource,
+  removeTeamMember,
   saveAreaSkill,
   setResearchFrequency,
+  setTeamLead,
   setUserRole,
   toggleSource,
 } from "@/app/actions";
 import { formatPipelineResult } from "@/components/customer/RadarTab";
 
-// Verwaltung (Client): Kundenliste mit Frequenz/Recherche/Löschen, Quellen je Kunde,
-// Benutzerrollen (Admin), Leistungsportfolio-Editor (wirkt auf die AI-Analyse).
+// Verwaltung (Client): Kundenliste mit Frequenz/Recherche/Löschen, Quellen und Team
+// je Kunde (Kernregel 3: Sichtbarkeit folgt der Team-Zuordnung), Benutzerrollen (Admin),
+// Leistungsportfolio-Editor (wirkt auf die AI-Analyse).
 
 type SourceRow = {
   id: string;
@@ -26,6 +30,8 @@ type SourceRow = {
   lastError: string | null;
 };
 
+type TeamRow = { id: string; userId: string; name: string; isLead: boolean };
+
 type CustomerRow = {
   id: string;
   name: string;
@@ -35,6 +41,7 @@ type CustomerRow = {
   leadName: string | null;
   signalCount: number;
   sources: SourceRow[];
+  team: TeamRow[];
 };
 
 type UserRow = { id: string; name: string; email: string; role: string; isSelf: boolean };
@@ -60,6 +67,8 @@ export default function AdminPanel({
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [teamExpanded, setTeamExpanded] = useState<string | null>(null);
+  const [addUserId, setAddUserId] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [running, setRunning] = useState<string | null>(null);
   const [portfolioText, setPortfolioText] = useState(portfolio);
@@ -144,6 +153,15 @@ export default function AdminPanel({
                   onClick={() => setExpanded(expanded === c.id ? null : c.id)}
                 >
                   Quellen ({c.sources.length})
+                </button>
+                <button
+                  className="rounded-el border border-gray-300 px-3 py-1.5 text-[0.82rem] font-medium hover:border-ink"
+                  onClick={() => {
+                    setTeamExpanded(teamExpanded === c.id ? null : c.id);
+                    setAddUserId("");
+                  }}
+                >
+                  Team ({c.team.length})
                 </button>
                 <span className="ml-auto">
                   {confirmDelete === c.id ? (
@@ -247,6 +265,83 @@ export default function AdminPanel({
                       }
                     >
                       + Quelle
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Team-Zuordnung (Kernregel 3): wer hier steht, sieht den Kunden */}
+              {teamExpanded === c.id && (
+                <div className="mt-4 border-t border-gray-75 pt-4">
+                  <p className="mb-3 text-[0.78rem] text-gray-500">
+                    Teammitglieder sehen diesen Kunden und seine Signale, Berichte und Aufgaben.
+                    Management/Admin sehen immer alles. Ändern dürfen der Account Lead und
+                    Management/Admin.
+                  </p>
+                  {c.team.map((m) => (
+                    <div
+                      key={m.id}
+                      className="flex flex-wrap items-center gap-3 border-b border-gray-75 py-2 text-[0.85rem]"
+                    >
+                      <span className="font-medium">{m.name}</span>
+                      <span
+                        className={`rounded px-2 py-0.5 text-[0.72rem] uppercase tracking-wide ${
+                          m.isLead ? "bg-accent-soft text-gray-900" : "bg-gray-75 text-gray-700"
+                        }`}
+                      >
+                        {m.isLead ? "Account Lead" : "Teammitglied"}
+                      </span>
+                      <span className="ml-auto flex gap-2">
+                        <button
+                          className="rounded border border-gray-150 px-2 py-0.5 text-[0.74rem] hover:border-ink"
+                          onClick={() =>
+                            act(() => setTeamLead(m.id, !m.isLead))
+                          }
+                        >
+                          {m.isLead ? "Lead entziehen" : "Zum Lead machen"}
+                        </button>
+                        <button
+                          className="rounded border border-gray-150 px-2 py-0.5 text-[0.74rem] text-neg hover:border-neg"
+                          onClick={() =>
+                            act(() => removeTeamMember(m.id), `${m.name} aus dem Team entfernt`)
+                          }
+                        >
+                          Entfernen
+                        </button>
+                      </span>
+                    </div>
+                  ))}
+                  {c.team.length === 0 && (
+                    <p className="py-2 text-[0.85rem] text-gray-500">
+                      Noch niemand zugeordnet – nur Management/Admin sehen diesen Kunden.
+                    </p>
+                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <select
+                      className="rounded-el border border-gray-300 bg-paper px-2 py-1.5 text-[0.82rem]"
+                      value={addUserId}
+                      onChange={(e) => setAddUserId(e.target.value)}
+                    >
+                      <option value="">Mitarbeiter wählen …</option>
+                      {users
+                        .filter((u) => !c.team.some((m) => m.userId === u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>
+                            {u.name} ({u.email})
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      className="rounded-el bg-ink px-3 py-1.5 text-[0.82rem] font-medium text-paper disabled:opacity-50"
+                      disabled={pending || !addUserId}
+                      onClick={() =>
+                        act(async () => {
+                          await addTeamMember(c.id, addUserId);
+                          setAddUserId("");
+                        }, "Zum Team hinzugefügt")
+                      }
+                    >
+                      + Zum Team hinzufügen
                     </button>
                   </div>
                 </div>

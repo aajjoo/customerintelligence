@@ -251,6 +251,52 @@ export async function setUserRole(userId: string, role: string) {
   revalidatePath("/", "layout");
 }
 
+/** Wirft, wenn der Benutzer das Team dieses Kunden nicht verwalten darf
+ *  (Account Lead des Kunden oder Management/Admin). */
+async function requireTeamAdmin(customerId: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Nicht angemeldet");
+  const { id, role } = session.user;
+  if (canSeeAllCustomers(role)) return;
+  const lead = await db.teamMembership.findFirst({
+    where: { userId: id, customerId, isLead: true },
+  });
+  if (!lead) {
+    throw new Error("Das Team ändern dürfen nur der Account Lead oder Management/Admin");
+  }
+}
+
+/** Mitarbeiter dem Kundenteam zuordnen (Kernregel 3: Sichtbarkeit folgt dem Team). */
+export async function addTeamMember(customerId: string, userId: string) {
+  await requireTeamAdmin(customerId);
+  await db.teamMembership.upsert({
+    where: { userId_customerId: { userId, customerId } },
+    create: { userId, customerId },
+    update: {},
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Lead-Status eines Teammitglieds setzen bzw. entziehen. */
+export async function setTeamLead(membershipId: string, isLead: boolean) {
+  const membership = await db.teamMembership.findUniqueOrThrow({
+    where: { id: membershipId },
+  });
+  await requireTeamAdmin(membership.customerId);
+  await db.teamMembership.update({ where: { id: membershipId }, data: { isLead } });
+  revalidatePath("/", "layout");
+}
+
+/** Mitarbeiter aus dem Kundenteam entfernen (er verliert die Sicht auf den Kunden). */
+export async function removeTeamMember(membershipId: string) {
+  const membership = await db.teamMembership.findUniqueOrThrow({
+    where: { id: membershipId },
+  });
+  await requireTeamAdmin(membership.customerId);
+  await db.teamMembership.delete({ where: { id: membershipId } });
+  revalidatePath("/", "layout");
+}
+
 /** Bereichs-Skill (Analyse-Anweisung) speichern; leerer Text deaktiviert den Bereich. */
 export async function saveAreaSkill(areaKey: string, instruction: string) {
   const session = await getServerSession(authOptions);

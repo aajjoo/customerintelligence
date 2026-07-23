@@ -24,11 +24,12 @@ export default async function VerwaltungPage() {
       orderBy: { name: "asc" },
       include: {
         sources: { orderBy: { label: "asc" } },
-        memberships: { where: { isLead: true }, include: { user: true } },
+        memberships: { include: { user: true }, orderBy: { user: { name: "asc" } } },
         _count: { select: { signals: true } },
       },
     }),
-    isAdmin ? db.user.findMany({ orderBy: { name: "asc" } }) : Promise.resolve([]),
+    // Benutzerliste auch für Leads: nötig für die Team-Zuweisung je Kunde
+    db.user.findMany({ orderBy: { name: "asc" } }),
     db.signal.count({ where: { isNew: true, customer: customerWhereForUser(user.id, user.role) } }),
     getAreaInstruction("leistungsportfolio"),
   ]);
@@ -61,8 +62,14 @@ export default async function VerwaltungPage() {
             slug: c.slug,
             industry: c.industry,
             researchFrequency: c.researchFrequency,
-            leadName: c.memberships[0]?.user.name ?? null,
+            leadName: c.memberships.find((m) => m.isLead)?.user.name ?? null,
             signalCount: c._count.signals,
+            team: c.memberships.map((m) => ({
+              id: m.id,
+              userId: m.userId,
+              name: m.user.name,
+              isLead: m.isLead,
+            })),
             sources: c.sources.map((s) => ({
               id: s.id,
               kind: s.kind,
