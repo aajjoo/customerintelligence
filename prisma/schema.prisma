@@ -32,6 +32,7 @@ model Customer {
   websiteUrl    String?
   teamLabel     String? // z. B. "Kundenteam A"
   profileJson   String? // Kundenprofil: Keywords, Mitbewerber, Themen (JSON)
+  researchFrequency String       @default("daily") // daily | weekly | off (Cron-Recherche)
   radarSince    DateTime         @default(now())
   memberships   TeamMembership[]
   signals       Signal[]

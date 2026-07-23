@@ -82,8 +82,12 @@ export function proposeSources(site: CrawledSite): SourceProposal[] {
   return sources;
 }
 
-/** Crawlt die URL und erzeugt den Profilvorschlag via Claude. */
-export async function extractProfile(url: string): Promise<CustomerProposal> {
+/** Crawlt die URL und erzeugt den Profilvorschlag via Claude.
+ *  teamInstruction: Bereichs-Skill "onboarding", vom Aufrufer geladen (hält dieses Modul DB-frei). */
+export async function extractProfile(
+  url: string,
+  teamInstruction?: string | null
+): Promise<CustomerProposal> {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error("ANTHROPIC_API_KEY ist nicht gesetzt – Profilextraktion nicht möglich");
   }
@@ -99,7 +103,16 @@ export async function extractProfile(url: string): Promise<CustomerProposal> {
       effort: "medium",
       format: { type: "json_schema", schema: EXTRACTION_SCHEMA },
     },
-    messages: [{ role: "user", content: buildExtractionPrompt(site) }],
+    messages: [
+      {
+        role: "user",
+        content:
+          buildExtractionPrompt(site) +
+          (teamInstruction
+            ? `\n\n## Zusätzliche Anweisungen des Teams (verbindlich)\n${teamInstruction}`
+            : ""),
+      },
+    ],
   });
 
   if (response.stop_reason === "refusal") {

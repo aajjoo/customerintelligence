@@ -13,11 +13,17 @@ export const dynamic = "force-dynamic";
 // "Braucht Aufmerksamkeit"-Panel (regelbasiert) und Portfolio-Kennzahlen.
 // Management/Admin sehen alle Kunden, alle anderen ihr eigenes Portfolio (Kernregel 3).
 
-export default async function PortfolioPage() {
+export default async function PortfolioPage({
+  searchParams,
+}: {
+  searchParams: { tage?: string };
+}) {
+  // Zeitraum umschaltbar (Feedback-Runde): 7 / 30 / 90 Tage
+  const range = [7, 30, 90].includes(Number(searchParams.tage)) ? Number(searchParams.tage) : 30;
   const now = new Date();
   const session = await getServerSession(authOptions);
   const user = session!.user;
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86_400_000);
+  const rangeStart = new Date(now.getTime() - range * 86_400_000);
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   const customers = await db.customer.findMany({
@@ -36,7 +42,7 @@ export default async function PortfolioPage() {
 
   const rows = customers.map((c) => ({
     name: c.name,
-    signals30: c.signals.filter((s) => s.occurredAt >= thirtyDaysAgo).length,
+    signals30: c.signals.filter((s) => s.occurredAt >= rangeStart).length,
     openOpps: c.opportunities.filter((o) => !["won", "dropped"].includes(o.stage)).length,
   }));
 
@@ -86,7 +92,24 @@ export default async function PortfolioPage() {
 
         <div className="mt-8 grid items-start gap-9 lg:grid-cols-[1fr_320px]">
           <div className="rounded-card border border-gray-150 p-5">
-            <h4 className="mb-3.5 text-[0.95rem]">Signale & Opportunities je Kunde, 30 Tage</h4>
+            <div className="mb-3.5 flex items-center justify-between">
+              <h4 className="text-[0.95rem]">Signale & Opportunities je Kunde, {range} Tage</h4>
+              <span className="flex gap-1">
+                {[7, 30, 90].map((t) => (
+                  <a
+                    key={t}
+                    href={`/portfolio?tage=${t}`}
+                    className={`rounded-full border px-2.5 py-0.5 text-[0.72rem] ${
+                      t === range
+                        ? "border-ink bg-ink font-medium text-paper"
+                        : "border-gray-300 text-gray-700 hover:border-ink"
+                    }`}
+                  >
+                    {t} T
+                  </a>
+                ))}
+              </span>
+            </div>
             <div className="h-[280px]">
               <ChartCanvas
                 config={{

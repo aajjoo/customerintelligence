@@ -31,7 +31,9 @@ Node.js 20+, dann `cp .env.example .env` (DATABASE_URL eintragen), `npm run setu
 
 ## Stand
 
-Alle 8 Etappen abgeschlossen.
+Alle 8 Etappen abgeschlossen, plus Feedback-Runde 1 (23.07.2026):
+
+**Feedback-Runde 1:** Globale Suche (Kunden/Signale/Projekte) und Benachrichtigungs-Dropdown in der Topbar sind funktional. Verwaltung (/verwaltung): Kunden löschen (mit Bestätigung, vollständige Kaskade), Recherche-Frequenz je Kunde (täglich/wöchentlich/aus – vom Cron respektiert, manuell geht immer), "Jetzt recherchieren", Quellen je Kunde anlegen/deaktivieren/löschen, Benutzerrollen (Management/Admin), Netural-Leistungsportfolio editierbar. Skills (/skills): Analyse-Anweisungen je Bereich (Radar-Scoring, Bericht, Chat, Onboarding), die direkt in die Claude-Prompts einfließen, plus Workflow-Skills anlegen/bearbeiten. Projekte lassen sich im Projekte-Tab mit KPI-Definitionen anlegen; Portfolio-Zeitraum umschaltbar (7/30/90 Tage).
 
 **Workflows (Etappe 8):** Skill-Framework aus der DB (Name, Beschreibung, Prompt-Template, Output-Art – neue Workflows ohne Deployment). Auf jeder offenen Aufgabe lässt sich ein Workflow starten (Skill-Auswahl: Meeting-Briefing, Wettbewerbsvergleich, Follow-up). Der Lauf sammelt Radar-Material (gleiches Retrieval wie der Chat), Claude erzeugt einen Entwurf mit Quellenangaben, jeder Schritt wird protokolliert. Kernregel 2: Ausspielung (Slack) erst nach expliziter menschlicher Freigabe; ohne Slack-Konfiguration wird der Schritt dokumentiert übersprungen. Entwurf ist vor der Freigabe einsehbar.
 

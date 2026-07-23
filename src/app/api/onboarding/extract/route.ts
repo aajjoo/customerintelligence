@@ -31,7 +31,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const proposal = await extractProfile(url);
+    const { getAreaInstruction } = await import("@/lib/areaSkills");
+    const proposal = await extractProfile(url, await getAreaInstruction("onboarding"));
     return NextResponse.json(proposal);
   } catch (e) {
     return NextResponse.json(

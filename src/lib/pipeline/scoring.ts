@@ -48,8 +48,20 @@ const SCORING_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+/** Optionale Team-Vorgaben (Bereichs-Skills), vom Orchestrator geladen. */
+export type ScoringExtras = {
+  /** Ersetzt das eingebaute Leistungsportfolio (Bereichs-Skill "leistungsportfolio") */
+  portfolio?: string | null;
+  /** Zusätzliche Scoring-Anweisungen des Teams (Bereichs-Skill "scoring") */
+  instruction?: string | null;
+};
+
 /** Baut den Bewertungs-Prompt für einen Batch (rein, getestet). */
-export function buildScoringPrompt(profile: CustomerProfile, items: RawItem[]): string {
+export function buildScoringPrompt(
+  profile: CustomerProfile,
+  items: RawItem[],
+  instruction?: string | null
+): string {
   const profileBlock = [
     `Kunde: ${profile.name}`,
     `Branche: ${profile.industry}`,
@@ -80,18 +92,23 @@ ${itemsBlock}
 Bewerte jede Meldung:
 - relevance: 0-100. Hoch (80+) nur, wenn die Meldung den Kunden direkt betrifft UND Netural daran anknüpfen kann. Mittel (50-79) bei klarem Kunden- oder Branchenbezug. Niedrig (<50) bei allgemeinen Nachrichten ohne Bezug.
 - dimension: markt (Markt & Branche), kunde (Kunde direkt), mitbewerb, innovation, geschaeft (Geschäftsebene: Zahlen, Personalien, Strategie), politik (Politik & Regulatorik).
-- titleDe und summaryDe auf Deutsch; die Zusammenfassung nennt den Bezug zum Kunden oder zu Netural-Leistungen, wenn vorhanden. Keine Aussagen erfinden, die nicht in der Meldung stehen.`;
+- titleDe und summaryDe auf Deutsch; die Zusammenfassung nennt den Bezug zum Kunden oder zu Netural-Leistungen, wenn vorhanden. Keine Aussagen erfinden, die nicht in der Meldung stehen.${
+    instruction ? `\n\n## Zusätzliche Anweisungen des Teams (verbindlich)\n${instruction}` : ""
+  }`;
 }
 
-/** System-Prompt: stabile Referenz (cachebar), volatiler Kundenkontext kommt in die User-Message. */
-const SYSTEM_PROMPT = `Du bist die Bewertungs-Pipeline des Netural Marktradars, einer Kundenintelligenz-Plattform. Du bewertest externe Meldungen auf Relevanz für einen Agenturkunden und für das Leistungsportfolio von Netural. Du antwortest ausschließlich mit dem geforderten JSON.
+/** System-Prompt: stabile Referenz (cachebar); Portfolio überschreibbar per Bereichs-Skill. */
+export function buildScoringSystemPrompt(portfolio?: string | null): string {
+  return `Du bist die Bewertungs-Pipeline des Netural Marktradars, einer Kundenintelligenz-Plattform. Du bewertest externe Meldungen auf Relevanz für einen Agenturkunden und für das Leistungsportfolio von Netural. Du antwortest ausschließlich mit dem geforderten JSON.
 
-${NETURAL_PORTFOLIO}`;
+${portfolio?.trim() || NETURAL_PORTFOLIO}`;
+}
 
 export type Scorer = (profile: CustomerProfile, items: RawItem[]) => Promise<ScoredItem[]>;
 
-/** Bewertet Items in Batches über die Claude API. */
-export const claudeScorer: Scorer = async (profile, items) => {
+/** Erzeugt den Claude-Scorer; Team-Vorgaben (Bereichs-Skills) kommen vom Orchestrator. */
+export function createClaudeScorer(extras?: ScoringExtras): Scorer {
+  return async (profile, items) => {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error(
       "ANTHROPIC_API_KEY ist nicht gesetzt – Claude-Scoring nicht möglich (Kernregel: keine unbewertete Ausspielung)"
@@ -106,13 +123,19 @@ export const claudeScorer: Scorer = async (profile, items) => {
       model: MODEL,
       max_tokens: 4096,
       system: [
-        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        {
+          type: "text",
+          text: buildScoringSystemPrompt(extras?.portfolio),
+          cache_control: { type: "ephemeral" },
+        },
       ],
       output_config: {
         effort: "medium",
         format: { type: "json_schema", schema: SCORING_SCHEMA },
       },
-      messages: [{ role: "user", content: buildScoringPrompt(profile, batch) }],
+      messages: [
+        { role: "user", content: buildScoringPrompt(profile, batch, extras?.instruction) },
+      ],
     });
 
     if (response.stop_reason === "refusal") {
@@ -126,7 +149,8 @@ export const claudeScorer: Scorer = async (profile, items) => {
     scored.push(...parseScoringResponse(text, batch));
   }
   return scored;
-};
+  };
+}
 
 /** Mappt die (schema-validierte) Antwort zurück auf die Items (rein, getestet). */
 export function parseScoringResponse(json: string, batch: RawItem[]): ScoredItem[] {

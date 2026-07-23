@@ -4,6 +4,7 @@
 // empfohlene Maßnahmen, die bei Freigabe zu Aufgaben werden.
 // Kernregel 1: Signal-Aussagen tragen die Quellenangabe aus dem Radar.
 import Anthropic from "@anthropic-ai/sdk";
+import { getAreaInstruction, instructionBlock } from "@/lib/areaSkills";
 import { db } from "@/lib/db";
 import { buildReportInput, type ReportBody } from "./input.ts";
 
@@ -108,6 +109,9 @@ export async function generateReport(customerId: string, month: string): Promise
     prevExecSummary: customer.reports[0]?.execSummary ?? null,
   });
 
+  // Bereichs-Skill "bericht": Team-Anweisungen für die Generierung
+  const teamInstruction = instructionBlock(await getAreaInstruction("bericht"));
+
   const client = new Anthropic();
   const response = await client.messages.create({
     model: MODEL,
@@ -118,7 +122,7 @@ export async function generateReport(customerId: string, month: string): Promise
       effort: "medium",
       format: { type: "json_schema", schema: REPORT_SCHEMA },
     },
-    messages: [{ role: "user", content: input }],
+    messages: [{ role: "user", content: input + teamInstruction }],
   });
 
   if (response.stop_reason === "refusal") {

@@ -174,6 +174,168 @@ export async function createCustomerFromProposal(proposal: {
   return { slug: customer.slug };
 }
 
+// ---------- Verwaltung (Feedback-Runde) ----------
+
+/** Kunde vollständig löschen (Verwaltung) – nur Account Lead bzw. Management/Admin. */
+export async function deleteCustomer(customerId: string) {
+  await requireLead(customerId);
+  // Cascade von Hand (Schema hat keine onDelete-Regeln): Reihenfolge beachtet FKs
+  await db.$transaction([
+    db.chatMessage.deleteMany({ where: { customerId } }),
+    db.workflowRun.deleteMany({ where: { task: { customerId } } }),
+    db.task.deleteMany({ where: { customerId } }),
+    db.opportunity.deleteMany({ where: { customerId } }),
+    db.signal.deleteMany({ where: { customerId } }),
+    db.kpiValue.deleteMany({ where: { kpi: { project: { customerId } } } }),
+    db.kpi.deleteMany({ where: { project: { customerId } } }),
+    db.project.deleteMany({ where: { customerId } }),
+    db.report.deleteMany({ where: { customerId } }),
+    db.source.deleteMany({ where: { customerId } }),
+    db.teamMembership.deleteMany({ where: { customerId } }),
+    db.customer.delete({ where: { id: customerId } }),
+  ]);
+  revalidatePath("/", "layout");
+}
+
+/** Recherche-Frequenz eines Kunden setzen (daily | weekly | off). */
+export async function setResearchFrequency(customerId: string, frequency: string) {
+  await requireCustomerAccess(customerId);
+  if (!["daily", "weekly", "off"].includes(frequency)) {
+    throw new Error("Frequenz muss daily, weekly oder off sein");
+  }
+  await db.customer.update({ where: { id: customerId }, data: { researchFrequency: frequency } });
+  revalidatePath("/", "layout");
+}
+
+/** Quelle für einen Kunden anlegen (Verwaltung). */
+export async function addSource(
+  customerId: string,
+  input: { kind: "news" | "website"; label: string; url: string }
+) {
+  await requireCustomerAccess(customerId);
+  if (!input.label.trim() || !input.url.trim()) throw new Error("Label und URL erforderlich");
+  new URL(input.url); // Validierung
+  await db.source.create({
+    data: { customerId, kind: input.kind, label: input.label.trim(), url: input.url.trim() },
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Quelle aktivieren/deaktivieren bzw. löschen (Verwaltung). */
+export async function toggleSource(sourceId: string) {
+  const source = await db.source.findUniqueOrThrow({ where: { id: sourceId } });
+  await requireCustomerAccess(source.customerId);
+  await db.source.update({ where: { id: sourceId }, data: { active: !source.active } });
+  revalidatePath("/", "layout");
+}
+
+export async function deleteSource(sourceId: string) {
+  const source = await db.source.findUniqueOrThrow({ where: { id: sourceId } });
+  await requireCustomerAccess(source.customerId);
+  // Signale behalten ihren Quellenbezug über sourceLabel; FK lösen
+  await db.signal.updateMany({ where: { sourceId }, data: { sourceId: null } });
+  await db.source.delete({ where: { id: sourceId } });
+  revalidatePath("/", "layout");
+}
+
+/** Benutzerrolle ändern – nur Management/Admin. */
+export async function setUserRole(userId: string, role: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !canSeeAllCustomers(session.user.role)) {
+    throw new Error("Rollen ändern dürfen nur Management und Admin");
+  }
+  if (!["member", "lead", "management", "admin"].includes(role)) {
+    throw new Error("Ungültige Rolle");
+  }
+  await db.user.update({ where: { id: userId }, data: { role } });
+  revalidatePath("/", "layout");
+}
+
+/** Bereichs-Skill (Analyse-Anweisung) speichern; leerer Text deaktiviert den Bereich. */
+export async function saveAreaSkill(areaKey: string, instruction: string) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) throw new Error("Nicht angemeldet");
+  if (!["lead", "management", "admin"].includes(session.user.role)) {
+    throw new Error("Skills bearbeiten dürfen Account Leads, Management und Admin");
+  }
+  const existing = await db.skill.findFirst({ where: { scope: "area", name: areaKey } });
+  if (existing) {
+    await db.skill.update({
+      where: { id: existing.id },
+      data: { promptTmpl: instruction, active: instruction.trim().length > 0 },
+    });
+  } else if (instruction.trim()) {
+    await db.skill.create({
+      data: { scope: "area", name: areaKey, promptTmpl: instruction, outputKind: null },
+    });
+  }
+  revalidatePath("/", "layout");
+}
+
+/** Workflow-Skill anlegen/bearbeiten (Skills-Seite). */
+export async function saveWorkflowSkill(input: {
+  id?: string;
+  name: string;
+  description: string;
+  promptTmpl: string;
+  outputKind: string;
+  active: boolean;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user || !["lead", "management", "admin"].includes(session.user.role)) {
+    throw new Error("Skills bearbeiten dürfen Account Leads, Management und Admin");
+  }
+  if (!input.name.trim()) throw new Error("Name erforderlich");
+  const data = {
+    name: input.name.trim(),
+    description: input.description.trim() || null,
+    promptTmpl: input.promptTmpl.trim() || null,
+    outputKind: input.outputKind || null,
+    active: input.active,
+    scope: "org",
+  };
+  if (input.id) await db.skill.update({ where: { id: input.id }, data });
+  else await db.skill.create({ data });
+  revalidatePath("/", "layout");
+}
+
+/** Projekt mit KPI-Definitionen anlegen (Projekte-Tab). */
+export async function createProject(
+  customerId: string,
+  input: {
+    name: string;
+    description: string;
+    phase: string;
+    status: string;
+    kpis: { label: string; unit: string; target: string; threshold: string; direction: string }[];
+  }
+) {
+  await requireCustomerAccess(customerId);
+  if (!input.name.trim()) throw new Error("Projektname erforderlich");
+  const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
+  await db.project.create({
+    data: {
+      customerId,
+      name: input.name.trim(),
+      description: input.description.trim() || null,
+      phase: input.phase.trim() || null,
+      status: ["ok", "watch", "critical"].includes(input.status) ? input.status : "ok",
+      kpis: {
+        create: input.kpis
+          .filter((k) => k.label.trim())
+          .map((k) => ({
+            label: k.label.trim(),
+            unit: k.unit.trim() || null,
+            target: num(k.target),
+            threshold: num(k.threshold),
+            direction: k.direction === "down" ? "down" : "up",
+          })),
+      },
+    },
+  });
+  revalidatePath("/", "layout");
+}
+
 /** Pipeline manuell für einen Kunden anstoßen (Quellen abrufen, bewerten, Review-Queue). */
 export async function runPipelineForCustomer(customerId: string) {
   await requireCustomerAccess(customerId);

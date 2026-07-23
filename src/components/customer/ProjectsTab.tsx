@@ -1,9 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import ChartCanvas from "@/components/ChartCanvas";
 import type { CustomerDTO, KpiDTO } from "@/components/customer/types";
-import { importKpiValues } from "@/app/actions";
+import { createProject, importKpiValues } from "@/app/actions";
 import { fmtKpiValue, kpiDelta } from "@/lib/format";
 import { PROJECT_STATUS } from "@/lib/i18n";
 
@@ -11,6 +12,7 @@ import { PROJECT_STATUS } from "@/lib/i18n";
 // Barrierefreiheit laut Spec), KPI-Kacheln, KPI-Verläufe mit Ziel- und Schwellenlinie.
 
 export default function ProjectsTab({ customer }: { customer: CustomerDTO }) {
+  const [createOpen, setCreateOpen] = useState(false);
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -19,12 +21,16 @@ export default function ProjectsTab({ customer }: { customer: CustomerDTO }) {
           {customer.projects.some((p) => p.externalRef) ? " · Referenzen aus Jira" : ""}
         </p>
         <button
-          className="rounded-el border border-gray-300 px-5 py-2.5 text-[0.9rem] font-medium text-gray-500"
-          title="Jira-/Projektsoftware-Sync folgt in Etappe 7"
+          className="rounded-el border border-gray-300 px-5 py-2.5 text-[0.9rem] font-medium hover:border-ink"
+          onClick={() => setCreateOpen(!createOpen)}
         >
-          + Projekt übernehmen
+          + Projekt anlegen
         </button>
       </div>
+
+      {createOpen && (
+        <CreateProject customerId={customer.id} onDone={() => setCreateOpen(false)} />
+      )}
 
       <div className="flex flex-col gap-[22px]">
         {customer.projects.map((p) => {
@@ -76,6 +82,150 @@ export default function ProjectsTab({ customer }: { customer: CustomerDTO }) {
         {customer.projects.length === 0 && (
           <p className="py-8 text-center text-[0.9rem] text-gray-500">Noch keine Projekte.</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** Projekt mit KPI-Definitionen anlegen (Feedback-Runde). */
+function CreateProject({ customerId, onDone }: { customerId: string; onDone: () => void }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: "", description: "", phase: "", status: "ok" });
+  const emptyKpi = { label: "", unit: "%", target: "", threshold: "", direction: "up" };
+  const [kpis, setKpis] = useState([{ ...emptyKpi }]);
+
+  function save() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await createProject(customerId, { ...form, kpis });
+        onDone();
+        router.refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Anlegen fehlgeschlagen");
+      }
+    });
+  }
+
+  const input =
+    "rounded-el border border-gray-300 px-3 py-2 text-[0.9rem] outline-none focus:border-ink";
+
+  return (
+    <div className="mb-6 rounded-card border border-gray-150 border-l-[3px] border-l-accent p-6">
+      <h3 className="mb-4 text-[1.05rem]">Neues Projekt</h3>
+      {error && <p className="mb-3 text-[0.85rem] text-neg">{error}</p>}
+      <div className="grid gap-3 md:grid-cols-2">
+        <input
+          className={input}
+          placeholder="Projektname *"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+        />
+        <input
+          className={input}
+          placeholder="Phase (z. B. Konzeption · Kickoff im Sept.)"
+          value={form.phase}
+          onChange={(e) => setForm({ ...form, phase: e.target.value })}
+        />
+        <input
+          className={`${input} md:col-span-2`}
+          placeholder="Beschreibung"
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+        />
+        <label className="flex items-center gap-2 text-[0.85rem] text-gray-700">
+          Status:
+          <select
+            className="rounded-el border border-gray-300 bg-paper px-2 py-1.5 text-[0.85rem]"
+            value={form.status}
+            onChange={(e) => setForm({ ...form, status: e.target.value })}
+          >
+            <option value="ok">Auf Kurs</option>
+            <option value="watch">Beobachten</option>
+            <option value="critical">Kritisch</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-4">
+        <div className="mb-2 text-[0.82rem] font-medium text-gray-700">
+          KPIs (optional) – Werte kommen später über den KPI-Import
+        </div>
+        {kpis.map((k, i) => (
+          <div key={i} className="mb-2 flex flex-wrap items-center gap-2">
+            <input
+              className={`${input} min-w-[160px] flex-1`}
+              placeholder="KPI-Name (z. B. Portal-Adoption)"
+              value={k.label}
+              onChange={(e) =>
+                setKpis(kpis.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))
+              }
+            />
+            <select
+              className="rounded-el border border-gray-300 bg-paper px-2 py-2 text-[0.85rem]"
+              value={k.unit}
+              onChange={(e) =>
+                setKpis(kpis.map((x, j) => (j === i ? { ...x, unit: e.target.value } : x)))
+              }
+            >
+              <option value="%">%</option>
+              <option value="count">Anzahl</option>
+              <option value="pt">Punkte</option>
+              <option value="eur">EUR</option>
+            </select>
+            <input
+              className={`${input} w-24`}
+              placeholder="Ziel"
+              value={k.target}
+              onChange={(e) =>
+                setKpis(kpis.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))
+              }
+            />
+            <input
+              className={`${input} w-24`}
+              placeholder="Schwelle"
+              value={k.threshold}
+              onChange={(e) =>
+                setKpis(kpis.map((x, j) => (j === i ? { ...x, threshold: e.target.value } : x)))
+              }
+            />
+            <select
+              className="rounded-el border border-gray-300 bg-paper px-2 py-2 text-[0.85rem]"
+              value={k.direction}
+              onChange={(e) =>
+                setKpis(kpis.map((x, j) => (j === i ? { ...x, direction: e.target.value } : x)))
+              }
+              title="Richtung: ist höher oder niedriger besser?"
+            >
+              <option value="up">höher = besser</option>
+              <option value="down">niedriger = besser</option>
+            </select>
+          </div>
+        ))}
+        <button
+          className="text-[0.82rem] text-gray-700 underline hover:text-ink"
+          onClick={() => setKpis([...kpis, { ...emptyKpi }])}
+        >
+          + weitere KPI
+        </button>
+      </div>
+
+      <div className="mt-5 flex justify-end gap-2">
+        <button
+          className="rounded-el border border-gray-300 px-4 py-2 text-[0.85rem] font-medium"
+          onClick={onDone}
+        >
+          Abbrechen
+        </button>
+        <button
+          className="rounded-el bg-ink px-4 py-2 text-[0.85rem] font-medium text-paper disabled:opacity-50"
+          onClick={save}
+          disabled={pending || !form.name.trim()}
+        >
+          {pending ? "Wird angelegt …" : "Projekt anlegen"}
+        </button>
       </div>
     </div>
   );

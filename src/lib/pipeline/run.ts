@@ -9,7 +9,8 @@ import { checkKpi, kpiSignalHash } from "./kpi";
 import { fetchFeed } from "./rss";
 import { checkTask } from "./taskcheck";
 import { crawlWebsite } from "./website";
-import { claudeScorer, type Scorer } from "./scoring";
+import { createClaudeScorer, type Scorer } from "./scoring";
+import { getAreaInstruction } from "@/lib/areaSkills";
 import type { CustomerProfile, CustomerRunStats, RawItem } from "./types";
 
 /** Obergrenze neuer Items pro Quelle und Lauf (Kosten-/Laufzeitkontrolle, wird geloggt). */
@@ -22,7 +23,13 @@ export async function runPipeline(options?: {
   trigger?: "cron" | "manual";
   scorer?: Scorer; // injizierbar für Tests
 }): Promise<{ runId: string; stats: CustomerRunStats[] }> {
-  const scorer = options?.scorer ?? claudeScorer;
+  // Team-Vorgaben aus den Bereichs-Skills (wirken auf die AI-Analyse)
+  const scorer =
+    options?.scorer ??
+    createClaudeScorer({
+      portfolio: await getAreaInstruction("leistungsportfolio"),
+      instruction: await getAreaInstruction("scoring"),
+    });
   const run = await db.pipelineRun.create({
     data: { trigger: options?.trigger ?? "manual" },
   });
@@ -66,8 +73,15 @@ export async function runPipeline(options?: {
       }
 
       // ---- Erfassung je Quelle ----
+      // Recherche-Frequenz je Kunde (nur für Cron-Läufe; manuell geht immer):
+      // daily = jeder Lauf, weekly = montags, off = keine externe Recherche
+      const day = new Date().getDay();
+      const researchDue =
+        options?.trigger !== "cron" ||
+        customer.researchFrequency === "daily" ||
+        (customer.researchFrequency === "weekly" && day === 1);
       const collected: { item: RawItem; sourceId: string; sourceLabel: string }[] = [];
-      for (const source of customer.sources) {
+      for (const source of researchDue ? customer.sources : []) {
         if (!source.url) continue;
         try {
           if (source.kind === "news") {

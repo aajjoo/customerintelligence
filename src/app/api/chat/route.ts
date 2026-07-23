@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { canSeeAllCustomers } from "@/lib/access";
+import { getAreaInstruction, instructionBlock } from "@/lib/areaSkills";
 import { authOptions } from "@/lib/auth";
 import { buildChatPrompt, CHAT_SCHEMA, CHAT_SYSTEM_PROMPT } from "@/lib/chat/prompt";
 import { retrieveContext } from "@/lib/chat/retrieve";
@@ -59,7 +60,12 @@ export async function POST(request: Request) {
   const messages: { role: "user" | "assistant"; content: string }[] = history
     .reverse()
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
-  messages.push({ role: "user", content: buildChatPrompt(customer.name, chunks, question) });
+  // Bereichs-Skill "chat": Team-Anweisungen für Chat-Antworten
+  const teamInstruction = instructionBlock(await getAreaInstruction("chat"));
+  messages.push({
+    role: "user",
+    content: buildChatPrompt(customer.name, chunks, question) + teamInstruction,
+  });
 
   const client = new Anthropic();
   const response = await client.messages.create({

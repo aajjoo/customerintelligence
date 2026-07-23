@@ -2,14 +2,14 @@ import Link from "next/link";
 import SignOutLink from "@/components/SignOutLink";
 
 // Feste Seitennavigation laut design-spec.md (mobil: Bottom-Navigation).
-// Aufgaben / Skills / Verwaltung folgen in späteren Etappen und führen wie im Prototyp auf Start.
+// Aufgaben (kundenübergreifende Sicht) folgt; bis dahin führt der Punkt auf Start.
 
 const NAV = [
   { href: "/", label: "Meine Kunden", match: "/" },
   { href: "/portfolio", label: "Portfolio", match: "/portfolio" },
   { href: "/", label: "Aufgaben", match: "/aufgaben" },
-  { href: "/", label: "Skills", match: "/skills" },
-  { href: "/", label: "Verwaltung", match: "/verwaltung" },
+  { href: "/skills", label: "Skills", match: "/skills" },
+  { href: "/verwaltung", label: "Verwaltung", match: "/verwaltung" },
 ];
 
 export default function Sidebar({
