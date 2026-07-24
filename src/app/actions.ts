@@ -388,6 +388,13 @@ export async function createProject(
     description: string;
     phase: string;
     status: string;
+    // Ziel-URLs & Wirtschaftlichkeit (Feedback-Runde 2): Jira-Key/URLs, Stundenbudget, DB-Ziel
+    externalRef?: string;
+    jiraUrl?: string;
+    confluenceUrl?: string;
+    budgetHours?: string;
+    spentHours?: string;
+    dbTargetPct?: string;
     kpis: { label: string; unit: string; target: string; threshold: string; direction: string }[];
   }
 ) {
@@ -400,6 +407,12 @@ export async function createProject(
       name: input.name.trim(),
       description: input.description.trim() || null,
       phase: input.phase.trim() || null,
+      externalRef: input.externalRef?.trim() || null,
+      jiraUrl: input.jiraUrl?.trim() || null,
+      confluenceUrl: input.confluenceUrl?.trim() || null,
+      budgetHours: num(input.budgetHours ?? ""),
+      spentHours: num(input.spentHours ?? ""),
+      dbTargetPct: num(input.dbTargetPct ?? ""),
       status: ["ok", "watch", "critical"].includes(input.status) ? input.status : "ok",
       kpis: {
         create: input.kpis
@@ -537,4 +550,73 @@ export async function approveReport(reportId: string) {
     data: { status: "approved", approvedAt: now },
   });
   revalidatePath("/", "layout");
+}
+
+/** Wirtschaftlichkeit & Ziel-URLs eines Projekts pflegen (Feedback-Runde 2). */
+export async function updateProjectEconomics(
+  projectId: string,
+  input: {
+    externalRef: string;
+    jiraUrl: string;
+    confluenceUrl: string;
+    budgetHours: string;
+    spentHours: string;
+    dbTargetPct: string;
+    phase: string;
+  }
+) {
+  const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+  await requireCustomerAccess(project.customerId);
+  const num = (s: string) => (s.trim() === "" ? null : Number(s.replace(",", ".")));
+  await db.project.update({
+    where: { id: projectId },
+    data: {
+      externalRef: input.externalRef.trim() || null,
+      jiraUrl: input.jiraUrl.trim() || null,
+      confluenceUrl: input.confluenceUrl.trim() || null,
+      budgetHours: num(input.budgetHours),
+      spentHours: num(input.spentHours),
+      dbTargetPct: num(input.dbTargetPct),
+      phase: input.phase.trim() || null,
+    },
+  });
+  revalidatePath("/", "layout");
+}
+
+/** Projekt löschen (samt KPIs und Werten). */
+export async function deleteProject(projectId: string) {
+  const project = await db.project.findUniqueOrThrow({ where: { id: projectId } });
+  await requireCustomerAccess(project.customerId);
+  await db.$transaction([
+    db.kpiValue.deleteMany({ where: { kpi: { projectId } } }),
+    db.kpi.deleteMany({ where: { projectId } }),
+    db.project.delete({ where: { id: projectId } }),
+  ]);
+  revalidatePath("/", "layout");
+}
+
+/** Jira-Projekte als Marktradar-Projekte übernehmen (Konzept 5.1: führendes System). */
+export async function importJiraProjects(
+  items: { key: string; name: string; url: string; customerId: string }[]
+) {
+  const { jiraConfigured } = await import("@/lib/integrations/jira");
+  if (!jiraConfigured()) throw new Error("Jira ist nicht konfiguriert (JIRA_* Env-Variablen)");
+  let created = 0;
+  for (const item of items) {
+    await requireCustomerAccess(item.customerId);
+    const exists = await db.project.findFirst({ where: { externalRef: item.key } });
+    if (exists) continue;
+    await db.project.create({
+      data: {
+        customerId: item.customerId,
+        name: item.name,
+        externalRef: item.key,
+        jiraUrl: item.url,
+        description: `Aus Jira übernommen (${item.key})`,
+      },
+    });
+    created++;
+  }
+  revalidatePath("/", "layout");
+  return { created };
 }

@@ -179,7 +179,7 @@ export default function RadarTab({
         </div>
 
         <div className="flex flex-col gap-6">
-          <Panel title="Signalvolumen, 6 Monate">
+          <Panel title="Signalvolumen, 8 Wochen">
             <div className="h-[150px]">
               <ChartCanvas
                 config={{

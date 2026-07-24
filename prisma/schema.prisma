@@ -126,16 +126,27 @@ model Task {
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  customer    Customer @relation(fields: [customerId], references: [id])
-  customerId  String
-  name        String
-  description String?
-  phase       String? // z. B. "Rollout · Meilenstein M4 am 15. Aug."
-  status      String   @default("ok") // ok | watch | critical
-  externalRef String? // Jira-Key o. ä.
-  kpis        Kpi[]
-  createdAt   DateTime @default(now())
+  id            String    @id @default(cuid())
+  customer      Customer  @relation(fields: [customerId], references: [id])
+  customerId    String
+  name          String
+  description   String?
+  phase         String? // z. B. "Rollout · Meilenstein M4 am 15. Aug."
+  status        String    @default("ok") // ok | watch | critical
+  externalRef   String? // Jira-Projekt-Key (führendes System, Konzept 5.1)
+  // Ziel-URLs der angebundenen Systeme (manuelle Anlage, Feedback-Runde 2)
+  jiraUrl       String?
+  confluenceUrl String?
+  // Stunden & Deckungsbeitrag: budgetiert manuell, verbraucht aus Jira-Worklogs oder manuell
+  budgetHours   Float?
+  spentHours    Float?
+  dbTargetPct   Float? // DB-Ziel in % (Einschätzung durch die Analyse)
+  // Sync-Ergebnisse aus Jira/Confluence
+  ticketStatsJson String? // Wochenreihe angelegt/gelöst + offene Tickets je Status
+  healthJson      String? // KI-Einschätzung: Probleme, DB-Bewertung, Quellen (Kernregel 1)
+  syncedAt        DateTime?
+  kpis          Kpi[]
+  createdAt     DateTime  @default(now())
 }
 
 model Kpi {

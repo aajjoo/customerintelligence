@@ -6,6 +6,7 @@ import SignOutLink from "@/components/SignOutLink";
 const NAV = [
   { href: "/", label: "Meine Kunden", match: "/" },
   { href: "/portfolio", label: "Portfolio", match: "/portfolio" },
+  { href: "/projekte", label: "Projekte", match: "/projekte" },
   { href: "/aufgaben", label: "Aufgaben", match: "/aufgaben" },
   { href: "/skills", label: "Skills", match: "/skills" },
   { href: "/verwaltung", label: "Verwaltung", match: "/verwaltung" },

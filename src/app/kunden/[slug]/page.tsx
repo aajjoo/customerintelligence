@@ -7,7 +7,6 @@ import type { CustomerDTO, TabKey, WorkflowStepDTO } from "@/components/customer
 import { customerWhereForUser } from "@/lib/access";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { lastMonths } from "@/lib/format";
 import { ROLE_LABELS } from "@/lib/i18n";
 
 export const dynamic = "force-dynamic";
@@ -57,11 +56,22 @@ export default async function CustomerPage({
   ]);
   if (!customer) notFound();
 
+  // Signalvolumen wochenweise (8 Wochen): Monatsbuckets waren bei einem jungen
+  // Radar fast leer und damit nicht aussagekräftig (Feedback-Runde 2)
   const monthFmt = new Intl.DateTimeFormat("de-AT", { month: "short" });
-  const monthly = lastMonths(6, now).map((m) => {
-    const end = new Date(m.start.getFullYear(), m.start.getMonth() + 1, 1);
-    const inMonth = customer.signals.filter((s) => s.occurredAt >= m.start && s.occurredAt < end);
-    return { label: m.label, total: inMonth.length, hot: inMonth.filter((s) => s.relevance >= 80).length };
+  const dayFmt = new Intl.DateTimeFormat("de-AT", { day: "numeric", month: "short" });
+  const monday = new Date(now);
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+  monday.setHours(0, 0, 0, 0);
+  const monthly = Array.from({ length: 8 }, (_, idx) => {
+    const start = new Date(monday.getTime() - (7 - idx) * 7 * 86_400_000);
+    const end = new Date(start.getTime() + 7 * 86_400_000);
+    const inWeek = customer.signals.filter((s) => s.occurredAt >= start && s.occurredAt < end);
+    return {
+      label: dayFmt.format(start),
+      total: inWeek.length,
+      hot: inWeek.filter((s) => s.relevance >= 80).length,
+    };
   });
 
   let competitors: string[] = [];
